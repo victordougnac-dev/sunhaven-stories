@@ -349,6 +349,8 @@ export class GameEngine {
     this.audio.playClick();
     this.playing = true;
     this.paused = false;
+    this.camCtrl.setMode('foot');
+    this.camCtrl.snap(this.player.yaw + Math.PI);
     this.ui.showGameplay();
     this.cg.gameplayStart();
   }
@@ -579,6 +581,7 @@ export class GameEngine {
       this.player.position.copy(exitPos);
       this.player.setVisible(true);
       this.camCtrl.setMode('foot');
+      this.camCtrl.snap(this.player.yaw + Math.PI);
       return;
     }
 
@@ -591,6 +594,7 @@ export class GameEngine {
       this.player.position.copy(exitPos);
       this.player.setVisible(true);
       this.camCtrl.setMode('foot');
+      this.camCtrl.snap(this.player.yaw + Math.PI);
       return;
     }
 
@@ -602,6 +606,7 @@ export class GameEngine {
       this.photoMode = false;
       this.ui.setPhotoMode(false);
       this.camCtrl.setMode(nearCar.spec.kind === 'boat' ? 'boat' : 'vehicle');
+      this.camCtrl.snap(nearCar.yaw);
       if (nearCar.isSecret) {
         this.eggMgr.unlock('egg_midnight_solaris');
       }
@@ -616,6 +621,7 @@ export class GameEngine {
       this.photoMode = false;
       this.ui.setPhotoMode(false);
       this.camCtrl.setMode('aircraft');
+      this.camCtrl.snap(nearAir.yaw);
       this.ui.showToast('Hold SHIFT to throttle up, W/S pitch, A/D roll, Q/E yaw!', 'info');
     }
   }
@@ -701,7 +707,7 @@ export class GameEngine {
       const v = this.vehicleCtrl.activeVehicle;
       focusPos = v.position;
       headingYaw = v.yaw;
-      focusSpeed = Math.abs(v.speed);
+      focusSpeed = v.speed;
     } else if (this.aircraftCtrl.activeAircraft) {
       this.vehicleCtrl.update(dt, this.input, this.timeMgr.isNight(), activeColliders, getGround);
       this.aircraftCtrl.update(dt, this.input, getGround);
@@ -759,8 +765,8 @@ export class GameEngine {
     const inVeh = Boolean(this.vehicleCtrl.activeVehicle || this.aircraftCtrl.activeAircraft);
     const isAir = Boolean(this.aircraftCtrl.activeAircraft);
     const speedNorm = isAir
-      ? Math.min(1, focusSpeed / 80)
-      : Math.min(1, focusSpeed / 50);
+      ? Math.min(1, Math.abs(focusSpeed) / 80)
+      : Math.min(1, Math.abs(focusSpeed) / 50);
     this.audio.updateAmbience(
       dt,
       distToOcean,
@@ -847,7 +853,7 @@ export class GameEngine {
 
       this.mapUI.renderMinimap(
         focusPos,
-        headingYaw,
+        inVeh ? headingYaw : headingYaw + Math.PI,
         this.worldMgr.buildingEntries,
         this.vehicleCtrl.vehicles,
         this.missionMgr.getActiveTargetPos()

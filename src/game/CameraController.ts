@@ -75,13 +75,16 @@ export class CameraController {
       this.currentTarget.lerp(desiredTarget, Math.min(1, dt * 14));
     }
 
-    // Gentle auto-align behind vehicle/aircraft when moving forward
-    if (isAutoFollow && speed > 3.5 && (this.mode === 'vehicle' || this.mode === 'boat' || this.mode === 'aircraft')) {
-      const targetCamYaw = headingYaw + Math.PI;
-      let diff = targetCamYaw - this.yaw;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      this.yaw += diff * Math.min(1, dt * 2.4);
+    // Auto-align behind vehicle/aircraft looking forward when driving forward, or look backward when reversing
+    if (isAutoFollow && (this.mode === 'vehicle' || this.mode === 'boat' || this.mode === 'aircraft')) {
+      const absSpeed = Math.abs(speed);
+      if (absSpeed > 1.2) {
+        const targetCamYaw = speed < -1.0 ? headingYaw + Math.PI : headingYaw;
+        let diff = targetCamYaw - this.yaw;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        this.yaw += diff * Math.min(1, dt * 3.8);
+      }
     }
 
     this.distance = THREE.MathUtils.lerp(this.distance, this.targetDistance, Math.min(1, dt * 8));
@@ -153,11 +156,12 @@ export class CameraController {
     camera.position.copy(this.currentPos);
     camera.lookAt(this.currentTarget);
 
+    const absSpd = Math.abs(speed);
     const targetFov =
       this.mode === 'aircraft'
-        ? 68 + Math.min(14, speed * 0.15)
+        ? 68 + Math.min(14, absSpd * 0.15)
         : this.mode === 'vehicle'
-        ? 60 + Math.min(14, speed * 0.32)
+        ? 60 + Math.min(14, absSpd * 0.32)
         : 60;
     if (Math.abs(camera.fov - targetFov) > 0.1) {
       camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, Math.min(1, dt * 6));
