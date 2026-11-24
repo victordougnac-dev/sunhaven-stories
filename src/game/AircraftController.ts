@@ -344,9 +344,9 @@ export class AircraftController {
       }
 
       // Clamp world boundaries & altitude ceiling
-      a.position.x = THREE.MathUtils.clamp(a.position.x, -720, 720);
-      a.position.z = THREE.MathUtils.clamp(a.position.z, -720, 720);
-      a.position.y = Math.min(280, a.position.y);
+      a.position.x = THREE.MathUtils.clamp(a.position.x, -1120, 1120);
+      a.position.z = THREE.MathUtils.clamp(a.position.z, -1120, 1120);
+      a.position.y = Math.min(340, a.position.y);
 
       const groundY = Math.max(-0.2, getGroundHeight(a.position.x, a.position.z));
       if (a.position.y <= groundY) {

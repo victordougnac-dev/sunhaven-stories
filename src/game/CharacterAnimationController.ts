@@ -29,245 +29,327 @@ export interface HumanoidRig {
   shinR: THREE.Group;
 }
 
+/**
+ * Creates a smooth contoured anatomical limb/torso geometry with elliptical cross-section.
+ */
+function createContouredProfile(
+  rings: { y: number; rx: number; rz: number; ox?: number; oz?: number }[],
+  radialSegs = 16
+): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  for (let r = 0; r < rings.length; r++) {
+    const ring = rings[r];
+    const ox = ring.ox ?? 0;
+    const oz = ring.oz ?? 0;
+    for (let s = 0; s <= radialSegs; s++) {
+      const theta = (s / radialSegs) * Math.PI * 2;
+      const x = ox + Math.cos(theta) * ring.rx;
+      const z = oz + Math.sin(theta) * ring.rz;
+      positions.push(x, ring.y, z);
+    }
+  }
+
+  const stride = radialSegs + 1;
+  for (let r = 0; r < rings.length - 1; r++) {
+    for (let s = 0; s < radialSegs; s++) {
+      const a = r * stride + s;
+      const b = a + 1;
+      const c = (r + 1) * stride + s;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Vertex-sculpts a realistic anatomical head (brow ridge, cheekbones, tapered jaw & chin).
+ */
+function createSculptedHeadGeometry(): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(0.112, 26, 22);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i);
+    let y = pos.getY(i);
+    let z = pos.getZ(i);
+
+    // Narrow temple/jaw width subtly
+    x *= 0.88;
+    // Elongate cranium vertically
+    y *= 1.12;
+
+    // Taper lower face into realistic jawline & chin
+    if (y < 0.01) {
+      const jawT = Math.min(1, (-y + 0.01) / 0.13);
+      x *= 1 - jawT * 0.32;
+      if (z > 0) {
+        z *= 1 - jawT * 0.14;
+        // Subtle chin protrusion
+        if (y < -0.06 && Math.abs(x) < 0.04) {
+          z += 0.012;
+        }
+      } else {
+        // Back of skull curve into neck
+        z *= 1 - jawT * 0.38;
+      }
+    }
+
+    // Cheekbone & brow contour on front face (+Z)
+    if (z > 0.04) {
+      if (y > 0.015 && y < 0.045) z += 0.008; // brow ridge
+      if (y > -0.025 && y < 0.008 && Math.abs(x) > 0.03 && Math.abs(x) < 0.075) z += 0.009; // cheekbones
+      if (y > -0.01 && y < 0.025 && Math.abs(x) > 0.018 && Math.abs(x) < 0.055) z -= 0.007; // eye sockets
+    }
+
+    pos.setXYZ(i, x, y, z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
   const root = new THREE.Group();
 
   const skinMat = new THREE.MeshStandardMaterial({
     color: appearance.skinColor,
-    roughness: 0.56,
+    roughness: 0.52,
     metalness: 0.02,
   });
   const lipMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(appearance.skinColor).multiplyScalar(0.76),
-    roughness: 0.5,
+    color: new THREE.Color(appearance.skinColor).multiplyScalar(0.74),
+    roughness: 0.45,
   });
   const shirtMat = new THREE.MeshStandardMaterial({
     color: appearance.shirtColor,
     roughness: 0.78,
-    metalness: 0.03,
+    metalness: 0.02,
   });
   const jacketMat = new THREE.MeshStandardMaterial({
     color: appearance.jacketColor ?? appearance.shirtColor,
     roughness: 0.62,
-    metalness: 0.06,
+    metalness: 0.05,
   });
   const pantsMat = new THREE.MeshStandardMaterial({
     color: appearance.pantsColor,
-    roughness: 0.84,
+    roughness: 0.85,
     metalness: 0.02,
   });
   const shoeMat = new THREE.MeshStandardMaterial({
     color: appearance.shoeColor,
-    roughness: 0.52,
+    roughness: 0.48,
     metalness: 0.08,
   });
-  const soleMat = new THREE.MeshStandardMaterial({
-    color: 0xf2f3f5,
-    roughness: 0.75,
-  });
+  const soleMat = new THREE.MeshStandardMaterial({ color: 0xefefef, roughness: 0.75 });
   const hairMat = new THREE.MeshStandardMaterial({
     color: appearance.hairColor,
-    roughness: 0.65,
-    metalness: 0.08,
+    roughness: 0.58,
+    metalness: 0.1,
   });
-  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.2 });
-  const irisMat = new THREE.MeshStandardMaterial({ color: 0x2f4b5e, roughness: 0.15 });
-  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0b0e12, roughness: 0.1 });
+  const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf7f7f7, roughness: 0.18 });
+  const irisMat = new THREE.MeshStandardMaterial({ color: 0x2b4d5e, roughness: 0.15 });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x0a0c10, roughness: 0.1 });
 
-  // Pelvis / Hips (~0.93m above ground)
+  // Pelvis / Hips (~0.94m)
   const hips = new THREE.Group();
-  hips.position.y = 0.93;
+  hips.position.y = 0.94;
   root.add(hips);
 
-  const pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), pantsMat);
-  pelvis.scale.set(1.12, 0.78, 0.76);
+  const pelvisGeo = createContouredProfile([
+    { y: -0.1, rx: 0.165, rz: 0.115 },
+    { y: -0.02, rx: 0.175, rz: 0.12 },
+    { y: 0.06, rx: 0.162, rz: 0.112 },
+    { y: 0.11, rx: 0.152, rz: 0.105 },
+  ]);
+  const pelvis = new THREE.Mesh(pelvisGeo, pantsMat);
   pelvis.castShadow = true;
   hips.add(pelvis);
 
   const belt = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.155, 0.162, 0.045, 18),
-    new THREE.MeshStandardMaterial({ color: 0x1d1f24, roughness: 0.4, metalness: 0.3 })
+    createContouredProfile([
+      { y: 0.065, rx: 0.165, rz: 0.115 },
+      { y: 0.105, rx: 0.158, rz: 0.11 },
+    ]),
+    new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.4, metalness: 0.35 })
   );
-  belt.scale.set(1.06, 1, 0.74);
-  belt.position.y = 0.065;
   hips.add(belt);
 
-  // Spine (abdomen + chest)
+  // Spine & Seamless V-Tapered Athletic Torso
   const spine = new THREE.Group();
-  spine.position.y = 0.08;
+  spine.position.y = 0.09;
   hips.add(spine);
 
-  const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.165, 0.148, 0.22, 18), shirtMat);
-  waist.scale.set(1.04, 1, 0.72);
-  waist.position.y = 0.1;
-  waist.castShadow = true;
-  spine.add(waist);
+  const abdomenGeo = createContouredProfile([
+    { y: 0.0, rx: 0.15, rz: 0.105 },
+    { y: 0.09, rx: 0.154, rz: 0.108, oz: 0.004 },
+    { y: 0.19, rx: 0.168, rz: 0.118, oz: 0.008 },
+  ]);
+  const abdomen = new THREE.Mesh(abdomenGeo, appearance.jacketColor !== undefined ? jacketMat : shirtMat);
+  abdomen.castShadow = true;
+  spine.add(abdomen);
 
   const chest = new THREE.Group();
-  chest.position.y = 0.21;
+  chest.position.y = 0.18;
   spine.add(chest);
 
-  const ribcage = new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.165, 0.28, 20), shirtMat);
-  ribcage.scale.set(1.08, 1, 0.72);
-  ribcage.position.y = 0.13;
-  ribcage.castShadow = true;
-  chest.add(ribcage);
+  // Muscular upper torso / ribcage / broad shoulders
+  const torsoMat = appearance.jacketColor !== undefined ? jacketMat : shirtMat;
+  const chestGeo = createContouredProfile([
+    { y: 0.0, rx: 0.168, rz: 0.118, oz: 0.008 },
+    { y: 0.12, rx: 0.198, rz: 0.132, oz: 0.012 },
+    { y: 0.23, rx: 0.218, rz: 0.125, oz: 0.006 },
+    { y: 0.295, rx: 0.185, rz: 0.102, oz: 0.0 },
+    { y: 0.33, rx: 0.072, rz: 0.072, oz: 0.0 },
+  ], 20);
+  const chestMesh = new THREE.Mesh(chestGeo, torsoMat);
+  chestMesh.castShadow = true;
+  chest.add(chestMesh);
 
-  // Rounded shoulder-chest cap
-  const shoulderBridge = new THREE.Mesh(
-    new THREE.SphereGeometry(0.192, 18, 12),
-    appearance.jacketColor !== undefined ? jacketMat : shirtMat
-  );
-  shoulderBridge.scale.set(1.14, 0.44, 0.74);
-  shoulderBridge.position.y = 0.25;
-  chest.add(shoulderBridge);
-
+  // Inner open-collar shirt V-panel on chest (+Z)
   if (appearance.jacketColor !== undefined) {
-    // Open tailored jacket wrapping smoothly around back and sides, open in front (+Z)
-    const jacketWrap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.203, 0.172, 0.48, 22, 1, false, Math.PI * 0.18, Math.PI * 1.64),
-      jacketMat
-    );
-    jacketWrap.scale.set(1.08, 1, 0.75);
-    jacketWrap.position.y = 0.03;
-    jacketWrap.castShadow = true;
-    chest.add(jacketWrap);
-
-    // Subtle open shirt chest panel in front (+Z)
-    const shirtFront = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.196, 0.168, 0.46, 16, 1, false, -Math.PI * 0.17, Math.PI * 0.34),
+    const vShirt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.05, 0.27, 12, 1, false, -0.55, 1.1),
       shirtMat
     );
-    shirtFront.scale.set(1.06, 1, 0.74);
-    shirtFront.position.y = 0.03;
-    chest.add(shirtFront);
+    vShirt.position.set(0, 0.17, 0.068);
+    chest.add(vShirt);
+
+    // Rolled collar around neck
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.016, 8, 16), jacketMat);
+    collar.rotation.x = Math.PI * 0.5 + 0.15;
+    collar.position.set(0, 0.315, 0.004);
+    chest.add(collar);
   }
 
-  // Neck & Sculpted Organic Head
+  // Anatomical Neck + Vertex-Sculpted Head
   const head = new THREE.Group();
-  head.position.y = 0.31;
+  head.position.y = 0.32;
   chest.add(head);
 
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.068, 0.12, 14), skinMat);
-  neck.position.y = 0.03;
+  const neckGeo = createContouredProfile([
+    { y: -0.01, rx: 0.064, rz: 0.062 },
+    { y: 0.04, rx: 0.055, rz: 0.056, oz: 0.004 },
+    { y: 0.09, rx: 0.054, rz: 0.058, oz: 0.006 },
+  ], 14);
+  const neck = new THREE.Mesh(neckGeo, skinMat);
   neck.castShadow = true;
   head.add(neck);
 
-  // Cranium + tapered jawline
-  const cranium = new THREE.Mesh(new THREE.SphereGeometry(0.115, 22, 18), skinMat);
-  cranium.scale.set(0.92, 1.08, 0.98);
-  cranium.position.set(0, 0.185, 0);
+  const cranium = new THREE.Mesh(createSculptedHeadGeometry(), skinMat);
+  cranium.position.set(0, 0.175, 0.006);
   cranium.castShadow = true;
   head.add(cranium);
 
-  const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.088, 18, 14), skinMat);
-  jaw.scale.set(0.86, 0.85, 0.94);
-  jaw.position.set(0, 0.135, 0.022);
-  head.add(jaw);
-
   // Ears
   for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.026, 10, 10), skinMat);
-    ear.scale.set(0.42, 1.15, 0.75);
-    ear.position.set(side * 0.104, 0.175, -0.005);
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 10), skinMat);
+    ear.scale.set(0.38, 1.2, 0.72);
+    ear.position.set(side * 0.096, 0.175, -0.004);
+    ear.rotation.z = side * -0.1;
     head.add(ear);
   }
 
   // Sculpted Nose
-  const noseBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.017, 0.048, 8), skinMat);
-  noseBridge.position.set(0, 0.178, 0.108);
-  noseBridge.rotation.x = -0.35;
+  const noseBridge = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.015, 0.044, 8), skinMat);
+  noseBridge.position.set(0, 0.178, 0.105);
+  noseBridge.rotation.x = -0.34;
   head.add(noseBridge);
-  const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.015, 10, 8), skinMat);
-  noseTip.position.set(0, 0.16, 0.118);
+  const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), skinMat);
+  noseTip.position.set(0, 0.159, 0.114);
   head.add(noseTip);
 
   // Lips
-  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), lipMat);
-  mouth.scale.set(1.35, 0.35, 0.55);
-  mouth.position.set(0, 0.126, 0.098);
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.021, 10, 8), lipMat);
+  mouth.scale.set(1.35, 0.32, 0.48);
+  mouth.position.set(0, 0.124, 0.095);
   head.add(mouth);
 
-  // Eyes & Eyebrows
+  // Realistic Eyes & Brows
   for (const side of [-1, 1]) {
-    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), eyeWhiteMat);
-    sclera.scale.set(1.1, 0.75, 0.65);
-    sclera.position.set(side * 0.04, 0.194, 0.098);
+    const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.015, 10, 8), eyeWhiteMat);
+    sclera.scale.set(1.15, 0.72, 0.6);
+    sclera.position.set(side * 0.036, 0.192, 0.095);
     head.add(sclera);
 
-    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.01, 10, 8), irisMat);
+    const iris = new THREE.Mesh(new THREE.SphereGeometry(0.0085, 10, 8), irisMat);
     iris.scale.set(1, 1, 0.5);
-    iris.position.set(side * 0.04, 0.194, 0.106);
+    iris.position.set(side * 0.036, 0.192, 0.102);
     head.add(iris);
 
-    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0055, 8, 8), pupilMat);
-    pupil.position.set(side * 0.04, 0.194, 0.109);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 8, 8), pupilMat);
+    pupil.position.set(side * 0.036, 0.192, 0.105);
     head.add(pupil);
 
-    const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.036, 6), hairMat);
-    brow.rotation.z = Math.PI * 0.5 + side * -0.08;
-    brow.position.set(side * 0.04, 0.214, 0.102);
+    const brow = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.032, 6), hairMat);
+    brow.rotation.z = Math.PI * 0.5 + side * -0.1;
+    brow.position.set(side * 0.036, 0.21, 0.099);
     head.add(brow);
   }
 
-  // Sculpted organic hair cap + front wave
+  // Layered Natural Hair (fitted cap + textured front/side locks)
   const hairCap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.121, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
+    new THREE.SphereGeometry(0.115, 22, 16, 0, Math.PI * 2, 0, Math.PI * 0.58),
     hairMat
   );
-  hairCap.scale.set(0.94, 1.04, 1.02);
-  hairCap.position.set(0, 0.192, -0.008);
-  hairCap.rotation.x = -0.22;
+  hairCap.scale.set(0.91, 1.09, 1.01);
+  hairCap.position.set(0, 0.184, -0.004);
+  hairCap.rotation.x = -0.24;
   hairCap.castShadow = true;
   head.add(hairCap);
 
-  const hairFront = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), hairMat);
-  hairFront.scale.set(1.25, 0.48, 0.78);
-  hairFront.position.set(0, 0.268, 0.048);
-  head.add(hairFront);
+  const hairLockMain = new THREE.Mesh(new THREE.SphereGeometry(0.068, 14, 10), hairMat);
+  hairLockMain.scale.set(1.18, 0.42, 0.72);
+  hairLockMain.position.set(0.008, 0.272, 0.044);
+  hairLockMain.rotation.z = -0.12;
+  head.add(hairLockMain);
+
+  const hairBackNape = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.062, 0.08, 14, 1, false, Math.PI * 0.65, Math.PI * 0.7), hairMat);
+  hairBackNape.position.set(0, 0.125, -0.015);
+  head.add(hairBackNape);
 
   if (appearance.sunglasses) {
-    const shadeMat = new THREE.MeshStandardMaterial({
-      color: 0x10141a,
-      roughness: 0.1,
-      metalness: 0.85,
-    });
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x22262e, metalness: 0.7, roughness: 0.3 });
+    const shadeMat = new THREE.MeshStandardMaterial({ color: 0x10141a, roughness: 0.08, metalness: 0.88 });
     for (const side of [-1, 1]) {
-      const lens = new THREE.Mesh(new THREE.SphereGeometry(0.027, 12, 10), shadeMat);
-      lens.scale.set(1.15, 0.72, 0.35);
-      lens.position.set(side * 0.041, 0.194, 0.112);
+      const lens = new THREE.Mesh(new THREE.SphereGeometry(0.024, 12, 10), shadeMat);
+      lens.scale.set(1.18, 0.7, 0.3);
+      lens.position.set(side * 0.037, 0.192, 0.109);
       head.add(lens);
     }
-    const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.03, 6), frameMat);
+    const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.026, 6), shadeMat);
     bridge.rotation.z = Math.PI * 0.5;
-    bridge.position.set(0, 0.198, 0.115);
+    bridge.position.set(0, 0.195, 0.111);
     head.add(bridge);
   }
 
   if (appearance.hatColor !== undefined) {
     const hatMat = new THREE.MeshStandardMaterial({ color: appearance.hatColor, roughness: 0.72 });
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.19, 0.016, 20), hatMat);
-    brim.position.set(0, 0.275, 0.01);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.175, 0.185, 0.014, 20), hatMat);
+    brim.position.set(0, 0.27, 0.012);
     head.add(brim);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.125, 0.09, 20), hatMat);
-    crown.position.set(0, 0.315, 0);
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.118, 0.085, 20), hatMat);
+    crown.position.set(0, 0.308, 0);
     head.add(crown);
   }
 
-  // Sculpted Arms (deltoid shoulder + tapered biceps + elbow sphere + tapered forearm + hand)
+  // Seamless Contoured Arms (no bulky ball joints!)
   const makeArm = (side: -1 | 1): [THREE.Group, THREE.Group] => {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.228, 0.23, 0);
+    shoulder.position.set(side * 0.212, 0.235, 0.002);
     chest.add(shoulder);
 
-    const deltoid = new THREE.Mesh(new THREE.SphereGeometry(0.062, 14, 12), jacketMat);
-    deltoid.scale.set(0.95, 1.05, 0.95);
-    deltoid.castShadow = true;
-    shoulder.add(deltoid);
-
-    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.044, 0.26, 14), jacketMat);
-    upper.position.y = -0.13;
+    const upperArmGeo = createContouredProfile([
+      { y: 0.02, rx: 0.052, rz: 0.052 },
+      { y: -0.02, rx: 0.056, rz: 0.056 }, // smooth deltoid taper
+      { y: -0.14, rx: 0.048, rz: 0.049 }, // bicep
+      { y: -0.265, rx: 0.039, rz: 0.04 }, // elbow
+    ], 14);
+    const upper = new THREE.Mesh(upperArmGeo, torsoMat);
     upper.castShadow = true;
     shoulder.add(upper);
 
@@ -275,23 +357,23 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     elbow.position.y = -0.265;
     shoulder.add(elbow);
 
-    const elbowJoint = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), skinMat);
-    elbow.add(elbowJoint);
-
-    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.032, 0.24, 14), skinMat);
-    forearm.position.y = -0.12;
+    const forearmGeo = createContouredProfile([
+      { y: 0.01, rx: 0.039, rz: 0.04 },
+      { y: -0.07, rx: 0.041, rz: 0.042 }, // forearm muscle
+      { y: -0.23, rx: 0.028, rz: 0.03 }, // wrist
+    ], 14);
+    const forearm = new THREE.Mesh(forearmGeo, skinMat);
     forearm.castShadow = true;
     elbow.add(forearm);
 
-    // Sculpted palm & fingers
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.036, 12, 10), skinMat);
-    hand.scale.set(0.75, 1.35, 0.95);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.034, 12, 10), skinMat);
+    hand.scale.set(0.68, 1.38, 0.92);
     hand.position.y = -0.265;
     elbow.add(hand);
 
-    const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.01, 0.04, 8), skinMat);
-    thumb.position.set(-side * 0.022, -0.255, 0.025);
-    thumb.rotation.z = side * 0.45;
+    const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.009, 0.038, 8), skinMat);
+    thumb.position.set(-side * 0.02, -0.252, 0.024);
+    thumb.rotation.z = side * 0.42;
     elbow.add(thumb);
 
     return [shoulder, elbow];
@@ -300,17 +382,19 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
   const [armL, forearmL] = makeArm(-1);
   const [armR, forearmR] = makeArm(1);
 
-  // Sculpted Legs (hip joint + tapered thigh + knee + contoured calf + sneaker)
+  // Seamless Contoured Legs (natural thigh -> knee -> calf -> ankle -> sculpted sneaker)
   const makeLeg = (side: -1 | 1): [THREE.Group, THREE.Group] => {
     const thigh = new THREE.Group();
-    thigh.position.set(side * 0.098, -0.04, 0);
+    thigh.position.set(side * 0.095, -0.035, 0);
     hips.add(thigh);
 
-    const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.082, 14, 12), pantsMat);
-    thigh.add(hipCap);
-
-    const upperLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.42, 16), pantsMat);
-    upperLeg.position.y = -0.21;
+    const thighGeo = createContouredProfile([
+      { y: 0.02, rx: 0.084, rz: 0.088 },
+      { y: -0.14, rx: 0.078, rz: 0.082 },
+      { y: -0.32, rx: 0.064, rz: 0.066 },
+      { y: -0.43, rx: 0.056, rz: 0.058 },
+    ], 16);
+    const upperLeg = new THREE.Mesh(thighGeo, pantsMat);
     upperLeg.castShadow = true;
     thigh.add(upperLeg);
 
@@ -318,28 +402,29 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     shin.position.y = -0.43;
     thigh.add(shin);
 
-    const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.058, 12, 10), pantsMat);
-    shin.add(kneeCap);
-
-    const lowerLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.044, 0.4, 16), pantsMat);
-    lowerLeg.position.y = -0.2;
+    const shinGeo = createContouredProfile([
+      { y: 0.01, rx: 0.056, rz: 0.058 },
+      { y: -0.14, rx: 0.059, rz: 0.064, oz: -0.006 }, // calf curve
+      { y: -0.34, rx: 0.044, rz: 0.048 }, // ankle
+      { y: -0.42, rx: 0.041, rz: 0.045 },
+    ], 16);
+    const lowerLeg = new THREE.Mesh(shinGeo, pantsMat);
     lowerLeg.castShadow = true;
     shin.add(lowerLeg);
 
-    // Sculpted sneaker with rounded toe & white sole
     const shoeGroup = new THREE.Group();
-    shoeGroup.position.set(0, -0.42, 0.035);
+    shoeGroup.position.set(0, -0.435, 0.035);
     shin.add(shoeGroup);
 
-    const shoeUpper = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), shoeMat);
-    shoeUpper.scale.set(0.88, 0.68, 1.75);
+    const shoeUpper = new THREE.Mesh(new THREE.SphereGeometry(0.062, 14, 10), shoeMat);
+    shoeUpper.scale.set(0.84, 0.65, 1.78);
     shoeUpper.position.y = 0.02;
     shoeUpper.castShadow = true;
     shoeGroup.add(shoeUpper);
 
-    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.06, 0.028, 14), soleMat);
-    sole.scale.set(0.92, 1, 1.85);
-    sole.position.y = -0.02;
+    const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.056, 0.058, 0.026, 14), soleMat);
+    sole.scale.set(0.88, 1, 1.88);
+    sole.position.y = -0.018;
     shoeGroup.add(sole);
 
     return [thigh, shin];
@@ -402,7 +487,7 @@ export class CharacterAnimationController {
     let forearmLX = (-0.35 - Math.max(0, s) * 0.45) * this.blendWeight;
     let forearmRX = (-0.35 - Math.max(0, -s) * 0.45) * this.blendWeight;
 
-    let hipsY = 0.93 + Math.abs(c) * 0.05 * this.blendWeight;
+    let hipsY = 0.94 + Math.abs(c) * 0.05 * this.blendWeight;
     let spineX = (state === 'sprint' ? 0.2 : state === 'run' ? 0.1 : 0.03) * this.blendWeight;
     let chestY = s * 0.09 * this.blendWeight;
     let headY = Math.sin(this.idleTime * 0.75) * 0.11 * (1 - this.blendWeight);

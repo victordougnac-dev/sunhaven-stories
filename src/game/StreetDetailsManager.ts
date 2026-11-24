@@ -14,8 +14,75 @@ export class StreetDetailsManager {
     this.buildStreetFurniture(getGroundHeight);
     this.buildRestaurantTerraces(getGroundHeight);
     this.buildBusStopsAndConstruction(getGroundHeight);
+    this.buildCoastalLandmarks(getGroundHeight);
     this.buildParkedAmbientCars(getGroundHeight);
     this.buildShadeTreesAndPlanters(getGroundHeight);
+  }
+
+  private buildCoastalLandmarks(getGroundHeight: (x: number, z: number) => number): void {
+    // 1. Sunhaven Coastal Gas Station near Harbor/Suburbs corner (76, 136)
+    const gy = getGroundHeight(76, 136);
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.45 });
+    const stripeMat = new THREE.MeshStandardMaterial({
+      color: 0xff6b4a,
+      emissive: 0xff6b4a,
+      emissiveIntensity: 0.35,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x2c3642, metalness: 0.65, roughness: 0.35 });
+    const pumpMat = new THREE.MeshStandardMaterial({ color: 0x1fd1c5, roughness: 0.35, metalness: 0.4 });
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(16, 0.9, 10), canopyMat);
+    canopy.position.set(86, gy + 5.2, 146);
+    canopy.castShadow = true;
+    const fascia = new THREE.Mesh(new THREE.BoxGeometry(16.2, 0.32, 10.2), stripeMat);
+    fascia.position.set(86, gy + 5.2, 146);
+    this.farDetailGroup.add(canopy, fascia);
+
+    for (const px of [81, 91]) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.32, 5.0, 10), metalMat);
+      col.position.set(px, gy + 2.5, 146);
+      const pump = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.7), pumpMat);
+      pump.position.set(px + 2.2, gy + 0.9, 146);
+      this.farDetailGroup.add(col, pump);
+    }
+
+    // 2. Palm Beach Volleyball Court (-228, 30)
+    const vy = getGroundHeight(-228, 30);
+    const netMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, wireframe: true });
+    for (const nz of [24, 36]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.5, 6), metalMat);
+      post.position.set(-228, vy + 1.25, nz);
+      this.farDetailGroup.add(post);
+    }
+    const net = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.0, 12), netMat);
+    net.position.set(-228, vy + 1.9, 30);
+    this.farDetailGroup.add(net);
+
+    // 3. Overhead Highway Directional Sign Gantries along Causeway & Downtown
+    for (const [gx, gz, ry] of [
+      [355, -120, Math.PI * 0.5],
+      [690, -120, Math.PI * 0.5],
+      [-60, -205, 0],
+    ] as [number, number, number][]) {
+      const ggy = getGroundHeight(gx, gz);
+      const gg = new THREE.Group();
+      for (const sx of [-9.5, 9.5]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 6.8, 8), metalMat);
+        leg.position.set(sx, 3.4, 0);
+        gg.add(leg);
+      }
+      const truss = new THREE.Mesh(new THREE.BoxGeometry(19.5, 0.45, 0.45), metalMat);
+      truss.position.y = 6.6;
+      const sign = new THREE.Mesh(
+        new THREE.BoxGeometry(7.2, 2.1, 0.2),
+        new THREE.MeshStandardMaterial({ color: 0x1b6e49, roughness: 0.4 })
+      );
+      sign.position.y = 6.6;
+      gg.add(truss, sign);
+      gg.position.set(gx, ggy, gz);
+      gg.rotation.y = ry;
+      this.farDetailGroup.add(gg);
+    }
   }
 
   private buildCrosswalks(): void {

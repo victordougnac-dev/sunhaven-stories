@@ -161,7 +161,7 @@ export class EasterEggManager {
         title: 'Hills Echo Note',
         clue: 'Visit the quiet abandoned cottage tucked into the Emerald Hills.',
         district: 'emerald_hills',
-        position: new THREE.Vector3(-155, getGroundHeight(-155, -320) + 0.5, -312),
+        position: new THREE.Vector3(-155, getGroundHeight(-155, -420) + 0.5, -412),
         rewardCash: 350,
         type: 'location',
       },

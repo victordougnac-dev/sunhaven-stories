@@ -64,7 +64,7 @@ export class MapUI {
       (e) => {
         e.preventDefault();
         const factor = e.deltaY < 0 ? 1.14 : 0.88;
-        this.zoom = Math.max(0.32, Math.min(2.6, this.zoom * factor));
+        this.zoom = Math.max(0.22, Math.min(2.6, this.zoom * factor));
       },
       { passive: false }
     );
@@ -96,27 +96,33 @@ export class MapUI {
       (wz - playerPos.z) * scale,
     ];
 
-    // Landmass block
-    const [lx1, lz1] = toMini(-210, -540);
-    const [lx2, lz2] = toMini(555, 260);
+    // Landmass block + Ocean Keys Island
+    const [lx1, lz1] = toMini(-210, -620);
+    const [lx2, lz2] = toMini(555, 360);
     ctx.fillStyle = '#203240';
     ctx.fillRect(lx1, lz1, lx2 - lx1, lz2 - lz1);
 
-    // Beach strip
-    const [bx1, bz1] = toMini(-265, -260);
+    const [ox1, oz1] = toMini(690, -410);
+    const [ox2, oz2] = toMini(940, 410);
+    ctx.fillRect(ox1, oz1, ox2 - ox1, oz2 - oz1);
+
+    // Beach strips
+    const [bx1, bz1] = toMini(-265, -360);
     ctx.fillStyle = '#73654a';
-    ctx.fillRect(bx1, bz1, 55 * scale, 510 * scale);
+    ctx.fillRect(bx1, bz1, 55 * scale, 610 * scale);
+    const [eb1, ebz1] = toMini(855, -400);
+    ctx.fillRect(eb1, ebz1, 75 * scale, 800 * scale);
 
     // Airport runway
     const [ax, az] = toMini(428, -40);
     ctx.fillStyle = '#47525e';
     ctx.fillRect(ax, az, 34 * scale, 370 * scale);
 
-    // Roads
+    // Roads & Bridges
     ctx.strokeStyle = '#536473';
     ctx.lineWidth = 6 * scale;
     for (const rx of ROAD_X) {
-      const [x1, z1] = toMini(rx, -260);
+      const [x1, z1] = toMini(rx, -375);
       const [, z2] = toMini(rx, 270);
       ctx.beginPath();
       ctx.moveTo(x1, z1);
@@ -129,6 +135,22 @@ export class MapUI {
       ctx.beginPath();
       ctx.moveTo(x1, z1);
       ctx.lineTo(x2, z1);
+      ctx.stroke();
+    }
+    for (const bz of [-120, 350]) {
+      const [x1, y1] = toMini(320, bz);
+      const [x2] = toMini(815, bz);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y1);
+      ctx.stroke();
+    }
+    for (const ox of [735, 815]) {
+      const [x1, z1] = toMini(ox, -360);
+      const [, z2] = toMini(ox, 400);
+      ctx.beginPath();
+      ctx.moveTo(x1, z1);
+      ctx.lineTo(x1, z2);
       ctx.stroke();
     }
 
@@ -211,12 +233,14 @@ export class MapUI {
     ctx.scale(this.zoom, this.zoom);
     ctx.translate(-this.panX, -this.panZ);
 
-    // Island landmass
+    // Mainland & Ocean Keys Island landmass
     ctx.fillStyle = '#1b2c38';
-    ctx.fillRect(-210, -540, 765, 800);
-    // Beach
+    ctx.fillRect(-210, -620, 765, 980);
+    ctx.fillRect(690, -410, 250, 820);
+    // Beaches
     ctx.fillStyle = '#b99f72';
-    ctx.fillRect(-265, -260, 60, 510);
+    ctx.fillRect(-265, -360, 60, 610);
+    ctx.fillRect(855, -400, 75, 800);
     // Secret Island
     ctx.beginPath();
     ctx.arc(-520, 120, 70, 0, Math.PI * 2);
@@ -237,12 +261,12 @@ export class MapUI {
     ctx.fillStyle = '#363f4a';
     ctx.fillRect(428, -40, 34, 370);
 
-    // Roads
+    // Roads & Coastal Bridges
     ctx.strokeStyle = '#4f5e6e';
     ctx.lineWidth = 14;
     for (const rx of ROAD_X) {
       ctx.beginPath();
-      ctx.moveTo(rx, -260);
+      ctx.moveTo(rx, -375);
       ctx.lineTo(rx, 270);
       ctx.stroke();
     }
@@ -250,6 +274,18 @@ export class MapUI {
       ctx.beginPath();
       ctx.moveTo(-200, rz);
       ctx.lineTo(350, rz);
+      ctx.stroke();
+    }
+    for (const bz of [-120, 350]) {
+      ctx.beginPath();
+      ctx.moveTo(320, bz);
+      ctx.lineTo(815, bz);
+      ctx.stroke();
+    }
+    for (const ox of [735, 815]) {
+      ctx.beginPath();
+      ctx.moveTo(ox, -360);
+      ctx.lineTo(ox, 400);
       ctx.stroke();
     }
 

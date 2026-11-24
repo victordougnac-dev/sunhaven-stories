@@ -578,8 +578,8 @@ export class VehicleController {
       if (v.spec.kind === 'boat') {
         const gNext = getGroundHeight(nextX, nextZ);
         if (gNext < -0.45) {
-          v.position.x = THREE.MathUtils.clamp(nextX, -700, 700);
-          v.position.z = THREE.MathUtils.clamp(nextZ, -700, 700);
+          v.position.x = THREE.MathUtils.clamp(nextX, -1060, 1060);
+          v.position.z = THREE.MathUtils.clamp(nextZ, -1060, 1060);
         } else {
           // Beach / pier collision stop
           v.speed *= -0.25;
@@ -589,8 +589,8 @@ export class VehicleController {
         // Ground vehicle collision check
         const prevX = v.position.x;
         const prevZ = v.position.z;
-        v.position.x = THREE.MathUtils.clamp(nextX, -700, 700);
-        v.position.z = THREE.MathUtils.clamp(nextZ, -700, 700);
+        v.position.x = THREE.MathUtils.clamp(nextX, -1060, 1060);
+        v.position.z = THREE.MathUtils.clamp(nextZ, -1060, 1060);
 
         const gY = getGroundHeight(v.position.x, v.position.z);
         if (gY < -1.1) {

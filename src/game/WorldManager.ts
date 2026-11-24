@@ -2,23 +2,24 @@ import * as THREE from 'three';
 import type { AABBCollider, BuildingEntryDef, DistrictDef, QualityPreset } from './types';
 import type { MaterialPalette } from './TextureFactory';
 import type { SurfaceType } from './AudioManager';
+import { BuildingArchitect, type BuildingArchetype } from './BuildingArchitect';
 
 export const ROAD_X = [-180, -60, 60, 180, 320];
-export const ROAD_Z = [-240, -120, 0, 120, 240];
+export const ROAD_Z = [-360, -240, -120, 0, 120, 240];
 
 export const DISTRICTS: DistrictDef[] = [
-  { id: 'downtown', name: 'Downtown Sunhaven', bounds: { minX: -120, maxX: 120, minZ: -180, maxZ: 60 }, color: '#45b7d1' },
+  { id: 'downtown', name: 'Downtown Sunhaven', bounds: { minX: -120, maxX: 120, minZ: -245, maxZ: 60 }, color: '#45b7d1' },
   { id: 'central_park', name: 'Central Palm Park', bounds: { minX: -55, maxX: 55, minZ: -115, maxZ: -5 }, color: '#4ecdc4' },
   { id: 'bayside_shops', name: 'Bayside Promenade', bounds: { minX: -175, maxX: -65, minZ: -115, maxZ: 115 }, color: '#ffbe76' },
-  { id: 'palm_beach', name: 'Palm Beach', bounds: { minX: -310, maxX: -185, minZ: -260, maxZ: 235 }, color: '#f6e58d' },
+  { id: 'palm_beach', name: 'Palm Beach', bounds: { minX: -310, maxX: -185, minZ: -360, maxZ: 235 }, color: '#f6e58d' },
   { id: 'neon_mile', name: 'Neon Mile', bounds: { minX: -175, maxX: 55, minZ: 65, maxZ: 235 }, color: '#ff6b6b' },
-  { id: 'marina', name: 'Sunhaven Marina', bounds: { minX: -395, maxX: -60, minZ: 235, maxZ: 430 }, color: '#22a6b3' },
+  { id: 'marina', name: 'Sunhaven Marina', bounds: { minX: -415, maxX: -60, minZ: 235, maxZ: 440 }, color: '#22a6b3' },
   { id: 'harbor_port', name: 'Harbor Port & Industrial', bounds: { minX: 60, maxX: 300, minZ: 125, maxZ: 360 }, color: '#95afc0' },
   { id: 'suburbs', name: 'Sunset Suburbs', bounds: { minX: 65, maxX: 305, minZ: -235, maxZ: 115 }, color: '#badc58' },
   { id: 'coral_heights', name: 'Coral Heights', bounds: { minX: 190, maxX: 410, minZ: -380, maxZ: -120 }, color: '#f0932b' },
-  { id: 'airport', name: 'Sunhaven Int. Airport', bounds: { minX: 305, maxX: 580, minZ: -70, maxZ: 360 }, color: '#7ed6df' },
-  { id: 'emerald_hills', name: 'Emerald Hills', bounds: { minX: -240, maxX: 390, minZ: -560, maxZ: -245 }, color: '#6ab04c' },
-  { id: 'secret_island', name: 'Coral Cove Island', bounds: { minX: -600, maxX: -440, minZ: 40, maxZ: 200 }, color: '#ff7979' },
+  { id: 'airport', name: 'Sunhaven Int. Airport', bounds: { minX: 305, maxX: 575, minZ: -70, maxZ: 360 }, color: '#7ed6df' },
+  { id: 'emerald_hills', name: 'Wynwood & Emerald Hills', bounds: { minX: -240, maxX: 390, minZ: -640, maxZ: -245 }, color: '#6ab04c' },
+  { id: 'secret_island', name: 'Ocean Keys & Coral Cove', bounds: { minX: 650, maxX: 980, minZ: -450, maxZ: 450 }, color: '#ff7979' },
 ];
 
 export interface TrafficSignalState {
@@ -40,6 +41,7 @@ export class WorldManager {
   private waterMesh!: THREE.Mesh;
   private waterNormalTex: THREE.CanvasTexture;
   private palette: MaterialPalette;
+  private architect!: BuildingArchitect;
 
   private palmFrondsInstanced!: THREE.InstancedMesh;
   private palmBaseMatrices: THREE.Matrix4[] = [];
@@ -58,12 +60,42 @@ export class WorldManager {
   constructor(scene: THREE.Scene, palette: MaterialPalette) {
     this.palette = palette;
     this.waterNormalTex = palette.waterNormal;
+    this.architect = new BuildingArchitect(palette, this.neonSignMats);
     scene.add(this.group);
     this.buildWorld();
   }
 
   getGroundHeight(x: number, z: number): number {
-    // Secret Coral Cove Island
+    // Venetian Coastal Causeway Bridges connecting Mainland to Ocean Keys Island (z = -120 and z = 350)
+    if (x >= 520 && x <= 715) {
+      for (const bz of [-120, 350]) {
+        if (Math.abs(z - bz) < 10.5) {
+          const mid = 617.5;
+          const distFromMid = Math.abs(x - mid);
+          const spanT = THREE.MathUtils.clamp(1 - distFromMid / 97.5, 0, 1);
+          return 0.2 + Math.sin(spanT * Math.PI * 0.5) * 3.8;
+        }
+      }
+    }
+
+    // Ocean Keys East Barrier Island (x in [685..960], z in [-440..440])
+    if (x >= 680 && x <= 980 && Math.abs(z) <= 440) {
+      if (z > 400 || z < -400) {
+        const tz = THREE.MathUtils.clamp((Math.abs(z) - 400) / 45, 0, 1);
+        return THREE.MathUtils.lerp(0.25, -5.0, tz);
+      }
+      if (x < 705) {
+        const tw = THREE.MathUtils.clamp((705 - x) / 30, 0, 1);
+        return THREE.MathUtils.lerp(0.25, -5.0, tw);
+      }
+      if (x > 875) {
+        const te = THREE.MathUtils.clamp((x - 875) / 85, 0, 1);
+        return THREE.MathUtils.lerp(0.25, -5.5, te);
+      }
+      return 0.25;
+    }
+
+    // Secret Coral Cove Island (West)
     const dxIsl = x + 520;
     const dzIsl = z - 120;
     const distIsl = Math.hypot(dxIsl, dzIsl);
@@ -99,20 +131,24 @@ export class WorldManager {
       return THREE.MathUtils.lerp(0.15, -5.5, t);
     }
 
-    // East outer ocean past airport/hills
+    // Bay channel between Mainland and Ocean Keys Island (x in [555..680])
     if (x > 555) {
-      const t = THREE.MathUtils.clamp((x - 555) / 85, 0, 1);
+      const t = THREE.MathUtils.clamp((x - 555) / 55, 0, 1);
       return THREE.MathUtils.lerp(0.15, -6.0, t);
     }
 
-    // Emerald Hills mountain region in the North
-    if (z < -255 && x > -210 && x < 420) {
-      const northT = THREE.MathUtils.clamp((-255 - z) / 240, 0, 1);
+    // Wynwood flat arts zone (z in [-370..-255], x in [-190..190])
+    if (z >= -370 && z < -255 && x >= -195 && x <= 195) {
+      return 0.15;
+    }
+
+    // Emerald Hills mountain region in the far North
+    if (z < -370 && x > -210 && x < 420) {
+      const northT = THREE.MathUtils.clamp((-370 - z) / 240, 0, 1);
       const ridge =
         Math.sin(x * 0.015) * 4.5 +
         Math.cos(z * 0.018) * 3.5 +
-        northT * 32;
-      // Flatten slightly near mountain road centerline x ~ 60..140
+        northT * 34;
       const roadDist = Math.abs(x - (60 + Math.sin(z * 0.015) * 45));
       if (roadDist < 12) {
         return Math.max(0.2, northT * 26);
@@ -127,8 +163,8 @@ export class WorldManager {
     }
 
     // City / Airport flat coastal shelf
-    if (z > 360 || z < -540) {
-      const edgeDist = z > 360 ? z - 360 : -540 - z;
+    if (z > 360 || z < -620) {
+      const edgeDist = z > 360 ? z - 360 : -620 - z;
       return THREE.MathUtils.lerp(0.15, -6.0, THREE.MathUtils.clamp(edgeDist / 80, 0, 1));
     }
 
@@ -142,6 +178,7 @@ export class WorldManager {
       }
     }
     if (x < -192 && x > -290 && z > -260 && z < 245) return 'sand';
+    if (x > 850 && x < 950 && Math.abs(z) < 400) return 'sand';
     if (Math.hypot(x + 520, z - 120) < 75) return 'sand';
     for (const rx of ROAD_X) {
       if (Math.abs(x - rx) < 10) return 'asphalt';
@@ -151,11 +188,12 @@ export class WorldManager {
     }
     if (x > 330 && x < 530 && z > -40 && z < 340) return 'asphalt';
     if (Math.abs(x) < 55 && z > -115 && z < -5) return 'grass';
-    if (z < -255) return 'grass';
+    if (z < -370) return 'grass';
     return 'asphalt';
   }
 
   getDistrictAt(x: number, z: number): DistrictDef {
+    if (Math.hypot(x + 520, z - 120) < 90) return DISTRICTS[11];
     for (const d of DISTRICTS) {
       if (
         x >= d.bounds.minX &&
@@ -200,14 +238,15 @@ export class WorldManager {
     this.buildHarborPort();
     this.buildAirport();
     this.buildEmeraldHillsAndIsland();
+    this.buildWynwoodAndOceanKeys();
     this.buildVegetationAndLights();
     this.buildSkyDetails();
   }
 
   private buildTerrainAndOcean(): void {
-    // Displaced high-detail terrain mesh covering [-650..650]
-    const segs = 96;
-    const size = 1360;
+    // Displaced high-detail terrain mesh covering [-1100..1100]
+    const segs = 128;
+    const size = 2200;
     const terrainGeo = new THREE.PlaneGeometry(size, size, segs, segs);
     terrainGeo.rotateX(-Math.PI / 2);
 
@@ -215,7 +254,7 @@ export class WorldManager {
     const colors = new Float32Array(pos.count * 3);
     const colSand = new THREE.Color(0xe6ce9c);
     const colGrass = new THREE.Color(0x47773f);
-    const colCity = new THREE.Color(0x7d807b);
+    const colCity = new THREE.Color(0x7a7e79);
     const colRock = new THREE.Color(0x61665e);
 
     for (let i = 0; i < pos.count; i++) {
@@ -225,9 +264,18 @@ export class WorldManager {
       pos.setY(i, y);
 
       let c = colCity;
-      if (x < -190 || Math.hypot(x + 520, z - 120) < 78 || y < 0.05) {
+      if (
+        x < -190 ||
+        x > 845 ||
+        Math.hypot(x + 520, z - 120) < 78 ||
+        y < 0.05
+      ) {
         c = colSand;
-      } else if (z < -250 || (Math.abs(x) < 55 && z > -115 && z < -5) || x > 195) {
+      } else if (
+        z < -370 ||
+        (Math.abs(x) < 55 && z > -115 && z < -5) ||
+        (x > 195 && x < 410 && z < -115)
+      ) {
         c = y > 16 ? colRock : colGrass;
       }
       colors[i * 3] = c.r;
@@ -268,7 +316,7 @@ export class WorldManager {
     const roadGroup = new THREE.Group();
     const minX = -200;
     const maxX = 350;
-    const minZ = -260;
+    const minZ = -375;
     const maxZ = 270;
 
     // N-S Roads + sidewalks
@@ -287,7 +335,6 @@ export class WorldManager {
         roadGroup.add(sw);
       }
 
-      // Dashed yellow center line
       for (let z = minZ + 8; z < maxZ - 8; z += 12) {
         const dash = new THREE.Mesh(
           new THREE.PlaneGeometry(0.28, 5.5),
@@ -326,6 +373,75 @@ export class WorldManager {
       }
     }
 
+    // Connector roads East across Airport North (z = -120) and South (z = 350) to Bridges
+    for (const bz of [-120, 350]) {
+      const link = new THREE.Mesh(new THREE.BoxGeometry(205, 0.13, 14), this.palette.asphalt);
+      link.position.set(422, 0.175, bz);
+      link.receiveShadow = true;
+      roadGroup.add(link);
+
+      // Venetian-style Coastal Causeway Bridge (x in [520..715])
+      const segs = 16;
+      const xStart = 520;
+      const xEnd = 715;
+      const dx = (xEnd - xStart) / segs;
+      for (let i = 0; i < segs; i++) {
+        const x1 = xStart + i * dx;
+        const x2 = x1 + dx;
+        const xm = (x1 + x2) * 0.5;
+        const ym = this.getGroundHeight(xm, bz);
+        const y1 = this.getGroundHeight(x1, bz);
+        const y2 = this.getGroundHeight(x2, bz);
+        const slope = Math.atan2(y2 - y1, dx);
+        const segLen = Math.hypot(dx, y2 - y1) + 0.3;
+
+        const deck = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.7, 15), this.palette.asphalt);
+        deck.position.set(xm, ym - 0.3, bz);
+        deck.rotation.z = slope;
+        deck.receiveShadow = true;
+        roadGroup.add(deck);
+
+        // Guardrails
+        for (const rSide of [-7.3, 7.3]) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(segLen, 0.85, 0.35), this.palette.concreteTrim);
+          rail.position.set(xm, ym + 0.42, bz + rSide);
+          rail.rotation.z = slope;
+          roadGroup.add(rail);
+        }
+
+        // Concrete bridge support piers in water
+        if (i % 3 === 1) {
+          const pier = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 8, 8), this.palette.concreteTrim);
+          pier.position.set(xm, ym - 4.2, bz - 5);
+          const pier2 = pier.clone();
+          pier2.position.set(xm, ym - 4.2, bz + 5);
+          roadGroup.add(pier, pier2);
+        }
+      }
+    }
+
+    // Ocean Keys Island Road Grid (x = 735, x = 815; z = -240, -120, 0, 120, 240, 350; boardwalk x = 854)
+    for (const ox of [735, 815]) {
+      const road = new THREE.Mesh(new THREE.BoxGeometry(14, 0.14, 760), this.palette.asphalt);
+      road.position.set(ox, 0.27, 20);
+      road.receiveShadow = true;
+      roadGroup.add(road);
+      for (const side of [-1, 1]) {
+        const sw = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.24, 760), this.palette.sidewalk);
+        sw.position.set(ox + side * 8.6, 0.27, 20);
+        roadGroup.add(sw);
+      }
+    }
+    for (const oz of [-240, -120, 0, 120, 240, 350]) {
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(130, 0.14, 14), this.palette.asphalt);
+      cross.position.set(775, 0.275, oz);
+      roadGroup.add(cross);
+    }
+    const boardwalk = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.28, 700), this.palette.woodPlank);
+    boardwalk.position.set(854, 0.35, 0);
+    boardwalk.receiveShadow = true;
+    roadGroup.add(boardwalk);
+
     // Intersections: Crosswalks + Traffic Lights
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x263038, metalness: 0.6, roughness: 0.4 });
     for (const rx of ROAD_X) {
@@ -360,6 +476,8 @@ export class WorldManager {
 
     // Urban plaza pavers covering city blocks (excluding Central Park grass & Beach)
     const blockSpecs: [number, number, number, number][] = [
+      [-120, -300, 102, 102], // Wynwood West
+      [0, -300, 102, 102],    // Wynwood East
       [-120, -180, 102, 102], // NW Downtown
       [0, -180, 102, 102],    // North Downtown
       [-120, -60, 102, 102],  // Bayside North
@@ -375,11 +493,12 @@ export class WorldManager {
       roadGroup.add(tileSlab);
     }
 
-    // Narrow mid-block asphalt service alleys in Bayside & Neon Mile
+    // Narrow mid-block asphalt service alleys in Bayside, Wynwood & Neon Mile
     for (const [ax, az, aw, ad] of [
       [-120, -20, 6.5, 195],
       [-120, 180, 6.5, 95],
       [0, -180, 6.5, 95],
+      [-120, -300, 6.5, 95],
     ] as [number, number, number, number][]) {
       const alley = new THREE.Mesh(new THREE.BoxGeometry(aw, 0.11, ad), this.palette.asphalt);
       alley.position.set(ax, 0.16, az);
@@ -397,71 +516,25 @@ export class WorldManager {
     d: number,
     h: number,
     styleIdx: number,
-    entry?: Omit<BuildingEntryDef, 'doorPos' | 'doorYaw'> & { doorSide: 'N' | 'S' | 'E' | 'W' }
+    entry?: Omit<BuildingEntryDef, 'doorPos' | 'doorYaw'> & { doorSide: 'N' | 'S' | 'E' | 'W' },
+    variant: 'octagonal' | 'stepped' | 'twin' = 'stepped'
   ): void {
-    const g = new THREE.Group();
-    const mat = this.palette.glassTowerDay[styleIdx % this.palette.glassTowerDay.length];
-    const trimMat = this.palette.concreteTrim;
-
-    // Ground-floor stone podium + recessed lobby glazing
-    const podiumH = Math.min(8.5, h * 0.18);
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(w + 2.2, podiumH, d + 2.2), trimMat);
-    podium.position.set(x, podiumH * 0.5 + 0.15, z);
-    podium.castShadow = true;
-    podium.receiveShadow = true;
-    g.add(podium);
-
-    const lobbyGlass = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 2.3, podiumH * 0.58, d + 2.3),
-      new THREE.MeshStandardMaterial({ color: 0x1b3344, roughness: 0.14, metalness: 0.8, envMapIntensity: 1.4 })
-    );
-    lobbyGlass.position.set(x, podiumH * 0.4 + 0.15, z);
-    g.add(lobbyGlass);
-
-    // Main shaft
-    const shaft = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    shaft.position.set(x, h * 0.5 + 0.15, z);
-    shaft.castShadow = true;
-    shaft.receiveShadow = true;
-    g.add(shaft);
-
-    // Horizontal architectural cornice ledges
-    for (let ly = 16; ly < h - 4; ly += 18) {
-      const ledge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.7, 0.55, d + 0.7), trimMat);
-      ledge.position.set(x, ly, z);
-      g.add(ledge);
+    const built = this.architect.buildTower(variant, x, z, w, d, h, styleIdx);
+    for (const c of built.colliderBoxes) {
+      this.addCollider(c.cx, c.cy, c.cz, c.w, c.h, c.d, 'building');
     }
-
-    // Upper setback crown + rooftop equipment
-    const topY = h > 36 ? h + h * 0.22 + 0.15 : h + 0.15;
-    if (h > 36) {
-      const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.74, h * 0.22, d * 0.74), mat);
-      crown.position.set(x, h + h * 0.11 + 0.15, z);
-      crown.castShadow = true;
-      g.add(crown);
-
-      const parapet = new THREE.Mesh(new THREE.BoxGeometry(w * 0.76, 1.1, d * 0.76), trimMat);
-      parapet.position.set(x, topY + 0.45, z);
-      g.add(parapet);
-
-      const spire = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.16, 0.36, 11, 6),
-        new THREE.MeshStandardMaterial({ color: 0xbac7d5, metalness: 0.75, roughness: 0.28 })
-      );
-      spire.position.set(x, topY + 5.5, z);
-      g.add(spire);
-    }
-
-    // Rooftop HVAC chillers
-    const hvacMat = new THREE.MeshStandardMaterial({ color: 0x6f7b85, roughness: 0.5, metalness: 0.55 });
-    const hvac = new THREE.Mesh(new THREE.BoxGeometry(w * 0.26, 1.8, d * 0.22), hvacMat);
-    hvac.position.set(x + w * 0.18, topY + 0.9, z - d * 0.15);
-    g.add(hvac);
-
-    this.addCollider(x, h * 0.5, z, w + 1.8, h + 12, d + 1.8, 'building');
 
     if (entry) {
-      const { pos, yaw } = this.attachEntranceMarker(g, x, 0.18, z, w + 2.2, d + 2.2, entry.doorSide, entry.name);
+      const { pos, yaw } = this.attachEntranceMarker(
+        built.group,
+        x,
+        0.18,
+        z,
+        w + 2.4,
+        d + 2.4,
+        entry.doorSide,
+        entry.name
+      );
       this.buildingEntries.push({
         id: entry.id,
         name: entry.name,
@@ -474,7 +547,25 @@ export class WorldManager {
       });
     }
 
-    this.group.add(g);
+    this.group.add(built.group);
+  }
+
+  private addArchBuilding(
+    archetype: Exclude<BuildingArchetype, 'tower_octagonal' | 'tower_stepped' | 'tower_twin'>,
+    x: number,
+    z: number,
+    w: number,
+    d: number,
+    h: number,
+    variantIdx: number,
+    neonColor?: number
+  ): void {
+    const baseY = this.getGroundHeight(x, z);
+    const built = this.architect.buildUniqueBuilding(archetype, x, baseY, z, w, d, h, variantIdx, neonColor);
+    for (const c of built.colliderBoxes) {
+      this.addCollider(c.cx, c.cy, c.cz, c.w, c.h, c.d, 'building');
+    }
+    this.group.add(built.group);
   }
 
   private addCoastalBuilding(
@@ -677,14 +768,14 @@ export class WorldManager {
   }
 
   private buildDowntownAndBayside(): void {
-    // Downtown block (x in [-45..45], z in [-225..-135] & [15..105], and [75..165] west)
+    // Downtown varied skyscraper skyline (octagonal, stepped, twin-wing)
     this.addSkyscraper(-26, -180, 26, 26, 78, 0, {
       id: 'downtown_tower',
       name: 'Sunhaven Apex Tower',
       category: 'office',
       district: 'downtown',
       doorSide: 'S',
-    });
+    }, 'stepped');
     // Rooftop Skybar elevator right beside Apex Tower!
     this.addSkyscraper(22, -180, 24, 24, 64, 1, {
       id: 'skybar_elevator',
@@ -694,7 +785,7 @@ export class WorldManager {
       doorSide: 'S',
       isRooftopTeleport: true,
       rooftopPos: new THREE.Vector3(-26, 95.5, -180),
-    });
+    }, 'octagonal');
 
     // Build actual rooftop lounge deck atop Apex Tower (-26, 95.5, -180)
     const roofDeck = new THREE.Mesh(
@@ -704,32 +795,31 @@ export class WorldManager {
     roofDeck.position.set(-26, 95.3, -180);
     this.group.add(roofDeck);
 
-    // More varied downtown towers & dense perimeter mid-rises
     this.addSkyscraper(-96, -180, 26, 24, 58, 2, {
       id: 'grand_hotel',
       name: 'Sunhaven Grand Hotel',
       category: 'apartment',
       district: 'downtown',
       doorSide: 'S',
-    });
-    this.addSkyscraper(-144, -178, 22, 22, 42, 3);
-    this.addCoastalBuilding(-150, -212, 20, 16, 16, 4, false, undefined, undefined, true);
-    this.addCoastalBuilding(-96, -212, 22, 16, 19, 1, false);
-    this.addCoastalBuilding(-148, -146, 20, 14, 14, 2, false);
-    this.addCoastalBuilding(-26, -212, 22, 16, 24, 0, false, undefined, undefined, true);
-    this.addCoastalBuilding(22, -212, 22, 16, 21, 5, false);
+    }, 'twin');
+    this.addSkyscraper(-144, -178, 22, 22, 46, 4, undefined, 'octagonal');
+    this.addArchBuilding('art_deco', -150, -212, 20, 16, 16, 0, 0x1fd1c5);
+    this.addArchBuilding('l_apartment', -96, -212, 22, 16, 19, 1);
+    this.addArchBuilding('art_deco', -148, -146, 20, 14, 14, 2, 0xff6b4a);
+    this.addArchBuilding('l_apartment', -26, -212, 22, 16, 22, 0);
+    this.addArchBuilding('mural_loft', 22, -212, 22, 16, 17, 1);
 
-    this.addSkyscraper(24, 56, 24, 24, 52, 0);
-    this.addSkyscraper(-24, 56, 24, 24, 68, 2);
-    this.addCoastalBuilding(-24, 92, 22, 15, 16, 3, false, 0x45b7d1, undefined, true);
-    this.addCoastalBuilding(24, 92, 22, 15, 18, 0, false);
-    this.addCoastalBuilding(-24, 24, 20, 14, 15, 5, false);
-    this.addCoastalBuilding(24, 24, 20, 14, 14, 2, false, undefined, undefined, true);
+    this.addSkyscraper(24, 56, 24, 24, 54, 4, undefined, 'twin');
+    this.addSkyscraper(-24, 56, 24, 24, 68, 2, undefined, 'octagonal');
+    this.addArchBuilding('art_deco', -24, 92, 22, 15, 16, 1, 0x45b7d1);
+    this.addArchBuilding('l_apartment', 24, 92, 22, 15, 18, 2);
+    this.addArchBuilding('mural_loft', -24, 24, 20, 14, 15, 0);
+    this.addArchBuilding('art_deco', 24, 24, 20, 14, 14, 3, 0xffb84d);
 
-    this.addSkyscraper(-96, -60, 24, 24, 46, 3);
+    this.addSkyscraper(-96, -60, 24, 24, 50, 3, undefined, 'twin');
 
-    // Bayside Promenade dense connected storefronts & apartments (x in [-165..-75], z in [-105..105])
-    this.addCoastalBuilding(-152, -88, 18, 22, 13.5, 4, false, undefined, undefined, true);
+    // Bayside Promenade varied coastal & Art Deco storefronts (x in [-165..-75], z in [-105..105])
+    this.addArchBuilding('art_deco', -152, -88, 18, 22, 13.5, 0, 0xff7b6b);
     this.addCoastalBuilding(-146, -54, 18, 15, 8.5, 1, false, 0x1fd1c5, {
       id: 'sunset_cafe',
       name: 'Sunset Cafe & Bistro',
@@ -744,15 +834,15 @@ export class WorldManager {
       district: 'bayside_shops',
       doorSide: 'E',
     });
-    this.addCoastalBuilding(-146, 24, 17, 15, 9, 0, true);
-    this.addCoastalBuilding(-150, 56, 18, 20, 12, 3, false);
-    this.addCoastalBuilding(-150, 88, 18, 20, 14.5, 5, false, undefined, undefined, true);
+    this.addArchBuilding('mediterranean', -146, 24, 18, 15, 9.5, 0);
+    this.addArchBuilding('l_apartment', -150, 56, 18, 20, 13, 3);
+    this.addArchBuilding('art_deco', -150, 88, 18, 20, 15, 1, 0x1fd1c5);
 
-    this.addCoastalBuilding(-96, 28, 18, 16, 11, 4, false);
-    this.addCoastalBuilding(-96, -22, 16, 14, 9.5, 5, false);
-    this.addCoastalBuilding(-90, 60, 18, 20, 13, 1, false, undefined, undefined, true);
-    this.addCoastalBuilding(-90, 90, 18, 20, 15, 6, false);
-    this.addCoastalBuilding(-92, -92, 18, 18, 12.5, 0, false);
+    this.addArchBuilding('l_apartment', -96, 28, 18, 16, 12, 4);
+    this.addArchBuilding('art_deco', -96, -22, 16, 14, 10, 2, 0xffb84d);
+    this.addArchBuilding('mural_loft', -90, 60, 18, 20, 13, 1);
+    this.addArchBuilding('art_deco', -90, 90, 18, 20, 15.5, 3, 0xff6b4a);
+    this.addArchBuilding('mediterranean', -92, -92, 18, 18, 12, 1);
 
     // Downtown Subway / Underground Bunker Stairs near (-72, -62)
     this.addCoastalBuilding(-72, -64, 8, 8, 4.2, 6, false, 0x1fd1c5, {
@@ -795,16 +885,16 @@ export class WorldManager {
       district: 'neon_mile',
       doorSide: 'N',
     });
-    this.addCoastalBuilding(-24, 165, 22, 18, 13, 3, false, 0xffb84d, undefined, true);
-    this.addCoastalBuilding(24, 165, 20, 18, 12, 1, false, 0xff6b4a);
-    this.addCoastalBuilding(-142, 205, 18, 16, 9, 5, false, 0x45b7d1);
-    this.addCoastalBuilding(-96, 206, 20, 16, 12, 2, false, 0xff6b4a, undefined, true);
-    this.addCoastalBuilding(-24, 206, 20, 16, 14, 4, false, 0x1fd1c5);
-    this.addCoastalBuilding(24, 206, 20, 16, 11, 6, false, 0xff477e, undefined, true);
+    this.addArchBuilding('art_deco', -24, 165, 22, 18, 14, 0, 0xffb84d);
+    this.addArchBuilding('mural_loft', 24, 165, 20, 18, 12, 2, 0xff6b4a);
+    this.addArchBuilding('art_deco', -142, 205, 18, 16, 10, 2, 0x45b7d1);
+    this.addArchBuilding('l_apartment', -96, 206, 20, 16, 13, 0);
+    this.addArchBuilding('mural_loft', -24, 206, 20, 16, 14, 1);
+    this.addArchBuilding('art_deco', 24, 206, 20, 16, 11.5, 3, 0xff477e);
   }
 
   private buildSuburbsAndCoralHeights(): void {
-    // Sunset Suburbs (x in [80..295], z in [-220..100])
+    // Sunset Suburbs Craftsman Homes with garages & porches
     const houseSpots: [number, number, number][] = [
       [95, -200, 0], [140, -200, 1], [95, -158, 2], [140, -158, 3],
       [95, -80, 4], [140, -80, 5], [95, -35, 6], [140, -35, 7],
@@ -817,28 +907,37 @@ export class WorldManager {
     const mailMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
 
     houseSpots.forEach(([hx, hz, idx], i) => {
-      this.addCoastalBuilding(
-        hx,
-        hz,
-        14 + (i % 3) * 2,
-        12 + (i % 2) * 2,
-        5.5 + (i % 2) * 1.5,
-        idx,
-        true,
-        undefined,
-        i === 0
-          ? {
-              id: 'suburban_home',
-              name: 'Palm Lane Residence',
-              category: 'villa',
-              district: 'suburbs',
-              doorSide: 'S',
-            }
-          : undefined,
-        i % 5 === 2
-      );
+      if (i === 0) {
+        this.addCoastalBuilding(
+          hx,
+          hz,
+          14,
+          12,
+          6.0,
+          idx,
+          true,
+          undefined,
+          {
+            id: 'suburban_home',
+            name: 'Palm Lane Residence',
+            category: 'villa',
+            district: 'suburbs',
+            doorSide: 'S',
+          },
+          false
+        );
+      } else {
+        this.addArchBuilding(
+          i % 4 === 0 ? 'mediterranean' : 'craftsman',
+          hx,
+          hz,
+          16 + (i % 3) * 2,
+          13 + (i % 2) * 2,
+          5.6 + (i % 2) * 1.2,
+          idx
+        );
+      }
 
-      // Suburban yard fences & curbside mailbox
       const gy = this.getGroundHeight(hx, hz);
       const fence = new THREE.Mesh(new THREE.BoxGeometry(18, 0.9, 0.22), fenceMat);
       fence.position.set(hx, gy + 0.45, hz - 9.5);
@@ -851,7 +950,7 @@ export class WorldManager {
       this.group.add(post, box);
     });
 
-    // Coral Heights Luxury Villas (elevated hillside)
+    // Coral Heights Luxury Mediterranean Villas (elevated hillside)
     this.addCoastalBuilding(275, -200, 24, 18, 8.5, 0, false, undefined, {
       id: 'coral_villa',
       name: 'Coral Heights Villa',
@@ -859,7 +958,6 @@ export class WorldManager {
       district: 'coral_heights',
       doorSide: 'W',
     });
-    // Infinity pool next to Coral Villa
     const poolY = this.getGroundHeight(275, -176);
     const pool = new THREE.Mesh(
       new THREE.BoxGeometry(16, 0.3, 8),
@@ -868,8 +966,9 @@ export class WorldManager {
     pool.position.set(275, poolY + 0.18, -176);
     this.group.add(pool);
 
-    this.addCoastalBuilding(330, -290, 22, 18, 9, 2, false);
-    this.addCoastalBuilding(245, -300, 20, 16, 8, 1, true);
+    this.addArchBuilding('mediterranean', 330, -290, 24, 18, 9, 0);
+    this.addArchBuilding('mediterranean', 245, -300, 22, 16, 8, 2);
+    this.addArchBuilding('mediterranean', 330, -210, 22, 18, 8.5, 1);
   }
 
   private buildCentralPark(): void {
@@ -1171,8 +1270,8 @@ export class WorldManager {
     this.group.add(dishBowl);
     this.addCollider(-120, dishY + 5, -390, 4.5, 10, 4.5, 'dish');
 
-    // Abandoned Cottage in Emerald Hills (-155, -320)
-    this.addCoastalBuilding(-155, -320, 11, 9, 5.0, 4, true);
+    // Abandoned Cottage in Emerald Hills (-155, -420)
+    this.addCoastalBuilding(-155, -420, 11, 9, 5.0, 4, true);
 
     // Coral Cove Secret Island ruins & palm cluster (-520, 120)
     const islY = this.getGroundHeight(-520, 120);
@@ -1182,6 +1281,94 @@ export class WorldManager {
     );
     ruinPillar.position.set(-520, islY + 2.5, 120);
     this.group.add(ruinPillar);
+  }
+
+  private buildWynwoodAndOceanKeys(): void {
+    // 1. Wynwood Arts District (z in [-345..-255], x in [-165..165])
+    const wynwoodSpots: [number, number, number][] = [
+      [-150, -330, 0], [-150, -280, 1],
+      [-92, -330, 2], [-92, -280, 0],
+      [-28, -330, 1], [-28, -280, 2],
+      [28, -330, 0], [28, -280, 1],
+      [95, -330, 2], [142, -330, 0],
+    ];
+    wynwoodSpots.forEach(([wx, wz, v], idx) => {
+      this.addArchBuilding(
+        idx % 3 === 2 ? 'l_apartment' : 'mural_loft',
+        wx,
+        wz,
+        20,
+        16,
+        9 + (idx % 3) * 3,
+        v
+      );
+    });
+
+    // 2. Ocean Keys East Barrier Island (Ocean Drive Art Deco Strip x = 775 & x = 838)
+    const decoZ = [-320, -280, -200, -160, -80, -40, 40, 80, 160, 200, 280, 320];
+    decoZ.forEach((oz, i) => {
+      this.addArchBuilding(
+        i % 4 === 3 ? 'mediterranean' : 'art_deco',
+        836,
+        oz,
+        22,
+        18,
+        10 + (i % 4) * 3.5,
+        i,
+        i % 2 === 0 ? 0x1fd1c5 : 0xff6b4a
+      );
+      this.addArchBuilding(
+        i % 2 === 0 ? 'l_apartment' : 'art_deco',
+        775,
+        oz,
+        24,
+        18,
+        14 + (i % 3) * 5,
+        i + 1
+      );
+    });
+
+    // Ocean Keys East Beach Lifeguard Towers & Umbrellas (x = 875)
+    const towerMat = new THREE.MeshStandardMaterial({ color: 0xf9f7f2, roughness: 0.6 });
+    const accentColors = [0xff6b4a, 0x1fd1c5, 0xffb84d];
+    for (let i = 0; i < 4; i++) {
+      const lz = -240 + i * 160;
+      const ly = this.getGroundHeight(882, lz);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(3.2, 3.0, 3.2), towerMat);
+      base.position.set(882, ly + 1.5, lz);
+      const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(3.0, 1.4, 4),
+        new THREE.MeshStandardMaterial({ color: accentColors[i % accentColors.length], roughness: 0.6 })
+      );
+      roof.position.set(882, ly + 3.9, lz);
+      roof.rotation.y = Math.PI * 0.25;
+      this.group.add(base, roof);
+    }
+
+    // Coastal Highway Billboards along Downtown, Airport & Causeway
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x38424d, metalness: 0.7, roughness: 0.4 });
+    const bbSpots: [number, number, number, number][] = [
+      [345, -104, 0, 0],
+      [510, -104, 1, 0],
+      [-55, -260, 2, Math.PI * 0.5],
+      [195, 138, 0, Math.PI * 0.25],
+    ];
+    for (const [bx, bz, mIdx, ry] of bbSpots) {
+      const by = this.getGroundHeight(bx, bz);
+      const bg = new THREE.Group();
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.52, 9, 8), poleMat);
+      post.position.y = 4.5;
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(14, 6.2, 0.5),
+        this.palette.billboardMaterials[mIdx % this.palette.billboardMaterials.length]
+      );
+      board.position.y = 10.6;
+      board.castShadow = true;
+      bg.add(post, board);
+      bg.position.set(bx, by, bz);
+      bg.rotation.y = ry;
+      this.group.add(bg);
+    }
   }
 
   private createPalmCrownGeometry(): THREE.BufferGeometry {
@@ -1250,6 +1437,11 @@ export class WorldManager {
       if (ROAD_X.every((rx) => Math.abs(px - rx) > 14) && ROAD_Z.every((rz) => Math.abs(pz - rz) > 14)) {
         spots.push(new THREE.Vector3(px, 0, pz));
       }
+    }
+    // Ocean Keys East Beach palms
+    for (let z = -340; z <= 340; z += 32) {
+      spots.push(new THREE.Vector3(860, 0, z));
+      spots.push(new THREE.Vector3(824, 0, z + 16));
     }
     // Secret island palms
     for (let i = 0; i < 8; i++) {

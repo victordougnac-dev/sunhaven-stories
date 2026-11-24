@@ -38,6 +38,12 @@ export interface MaterialPalette {
   glassTowerDay: THREE.MeshStandardMaterial[];
   glassTowerEmissive: THREE.CanvasTexture[];
   stuccoMaterials: THREE.MeshStandardMaterial[];
+  artDecoMaterials: THREE.MeshStandardMaterial[];
+  muralMaterials: THREE.MeshStandardMaterial[];
+  mediterraneanMaterials: THREE.MeshStandardMaterial[];
+  sidingMaterials: THREE.MeshStandardMaterial[];
+  loftBrickMaterials: THREE.MeshStandardMaterial[];
+  billboardMaterials: THREE.MeshStandardMaterial[];
   industrialMetal: THREE.MeshStandardMaterial;
   waterNormal: THREE.CanvasTexture;
 }
@@ -77,44 +83,38 @@ export class TextureFactory {
       metalness: 0.05,
     });
 
-    const sandTex = this.createSandTexture();
     const sand = new THREE.MeshStandardMaterial({
-      map: sandTex,
+      map: this.createSandTexture(),
       roughness: 0.94,
       metalness: 0.0,
     });
 
-    const grassTex = this.createGrassTexture();
     const grass = new THREE.MeshStandardMaterial({
-      map: grassTex,
+      map: this.createGrassTexture(),
       roughness: 0.9,
       metalness: 0.0,
     });
 
-    const rockTex = this.createRockTexture();
     const mountainRock = new THREE.MeshStandardMaterial({
-      map: rockTex,
+      map: this.createRockTexture(),
       roughness: 0.92,
       metalness: 0.04,
     });
 
-    const woodTex = this.createWoodTexture();
     const woodPlank = new THREE.MeshStandardMaterial({
-      map: woodTex,
+      map: this.createWoodTexture(),
       roughness: 0.76,
       metalness: 0.05,
     });
 
-    const runwayTex = this.createRunwayTexture();
     const runway = new THREE.MeshStandardMaterial({
-      map: runwayTex,
+      map: this.createRunwayTexture(),
       roughness: 0.82,
       metalness: 0.08,
     });
 
-    const brickTex = this.createBrickTexture('#8b4b3c');
     const brickWall = new THREE.MeshStandardMaterial({
-      map: brickTex,
+      map: this.createBrickTexture('#8b4b3c'),
       bumpMap: asphaltBump,
       bumpScale: 0.03,
       roughness: 0.88,
@@ -134,6 +134,7 @@ export class TextureFactory {
       { base: '#2c4159', frame: '#75899e', glow: '#9be7ff' },
       { base: '#574a42', frame: '#a8998c', glow: '#ffe29c' },
       { base: '#465e6b', frame: '#c4cfd6', glow: '#ffdfbe' },
+      { base: '#235952', frame: '#94b5ae', glow: '#ffe8b8' },
     ];
     const glassTowerDay: THREE.MeshStandardMaterial[] = [];
     const glassTowerEmissive: THREE.CanvasTexture[] = [];
@@ -147,9 +148,9 @@ export class TextureFactory {
           emissiveMap: emissive,
           emissive: new THREE.Color(0xffffff),
           emissiveIntensity: 0.0,
-          roughness: 0.22,
-          metalness: 0.58,
-          envMapIntensity: 1.35,
+          roughness: 0.2,
+          metalness: 0.62,
+          envMapIntensity: 1.45,
         })
       );
     }
@@ -165,9 +166,8 @@ export class TextureFactory {
       '#cfe0c3',
     ];
     const stuccoMaterials = stuccoColors.map((col) => {
-      const tex = this.createStuccoFacadeTexture(col);
       return new THREE.MeshStandardMaterial({
-        map: tex,
+        map: this.createStuccoFacadeTexture(col),
         bumpMap: asphaltBump,
         bumpScale: 0.015,
         roughness: 0.8,
@@ -175,9 +175,79 @@ export class TextureFactory {
       });
     });
 
-    const metalTex = this.createCorrugatedMetalTexture();
+    const artDecoSpecs = [
+      { wall: '#f6e7d8', trim: '#ff7b6b', accent: '#36c7bd' },
+      { wall: '#dff2ec', trim: '#f2b857', accent: '#ff7062' },
+      { wall: '#fce1d4', trim: '#ffffff', accent: '#2fb8b0' },
+      { wall: '#e4ecf4', trim: '#ff905c', accent: '#355c7d' },
+    ];
+    const artDecoMaterials = artDecoSpecs.map((s) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createArtDecoTexture(s.wall, s.trim, s.accent),
+        bumpMap: asphaltBump,
+        bumpScale: 0.02,
+        roughness: 0.72,
+        metalness: 0.05,
+      });
+    });
+
+    const muralPalettes = [
+      ['#ff6b4a', '#1fd1c5', '#ffd166', '#162838'],
+      ['#3a86ff', '#ff006e', '#ffbe0b', '#fb5607'],
+      ['#2ec4b6', '#ff9f1c', '#e71d36', '#011627'],
+    ];
+    const muralMaterials = muralPalettes.map((pal) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createMuralTexture(pal),
+        roughness: 0.82,
+        metalness: 0.03,
+      });
+    });
+
+    const medColors = ['#f0dfc8', '#e6c39c', '#ead5c1'];
+    const mediterraneanMaterials = medColors.map((col) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createMediterraneanTexture(col),
+        bumpMap: asphaltBump,
+        bumpScale: 0.02,
+        roughness: 0.84,
+      });
+    });
+
+    const sidingColors = ['#cfdce3', '#dce4d2', '#ebe4d1', '#e8d0c3'];
+    const sidingMaterials = sidingColors.map((col) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createSidingTexture(col),
+        roughness: 0.78,
+      });
+    });
+
+    const loftBrickMaterials = ['#7a3e33', '#524947'].map((col) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createLoftBrickTexture(col),
+        bumpMap: asphaltBump,
+        bumpScale: 0.03,
+        roughness: 0.85,
+      });
+    });
+
+    const billboardSpecs = [
+      { bg: '#0c2338', title: 'VISIT SUNHAVEN', sub: 'OCEAN DRIVE & CORAL KEYS', col: '#1fd1c5' },
+      { bg: '#26141a', title: 'SOLARIS GT', sub: 'COASTAL PERFORMANCE MOTORS', col: '#ff6b4a' },
+      { bg: '#152218', title: 'SUNBIRD AIR', sub: 'DAILY ISLAND CHARTERS', col: '#ffb84d' },
+    ];
+    const billboardMaterials = billboardSpecs.map((b) => {
+      return new THREE.MeshStandardMaterial({
+        map: this.createBillboardTexture(b.bg, b.title, b.sub, b.col),
+        emissive: new THREE.Color(0xffffff),
+        emissiveMap: this.createBillboardTexture(b.bg, b.title, b.sub, b.col),
+        emissiveIntensity: 0.25,
+        roughness: 0.4,
+      });
+    });
+
     const industrialMetal = new THREE.MeshStandardMaterial({
-      map: metalTex,
+      map: this.createCorrugatedMetalTexture(),
       roughness: 0.48,
       metalness: 0.55,
     });
@@ -198,6 +268,12 @@ export class TextureFactory {
       glassTowerDay,
       glassTowerEmissive,
       stuccoMaterials,
+      artDecoMaterials,
+      muralMaterials,
+      mediterraneanMaterials,
+      sidingMaterials,
+      loftBrickMaterials,
+      billboardMaterials,
       industrialMetal,
       waterNormal,
     };
@@ -210,12 +286,200 @@ export class TextureFactory {
     return tex;
   }
 
+  private createArtDecoTexture(wall: string, trim: string, accent: string): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(256, 256);
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Fluted vertical Art Deco pilasters
+    ctx.fillStyle = trim;
+    for (const x of [0, 78, 170, 244]) {
+      ctx.fillRect(x, 0, 12, 256);
+    }
+
+    // Horizontal Art Deco speedlines
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 118, 256, 7);
+    ctx.fillRect(0, 240, 256, 8);
+
+    // Rounded-corner coastal windows with horizontal eyebrow shades
+    for (let r = 0; r < 2; r++) {
+      for (let col = 0; col < 3; col++) {
+        const x = 22 + col * 80;
+        const y = 26 + r * 120;
+        ctx.fillStyle = trim;
+        ctx.fillRect(x - 5, y - 8, 60, 7);
+        ctx.fillStyle = '#244559';
+        ctx.fillRect(x, y, 50, 62);
+        ctx.fillStyle = 'rgba(200,240,255,0.22)';
+        ctx.fillRect(x + 4, y + 4, 16, 54);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, 50, 62);
+      }
+    }
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
+  private createMuralTexture(pal: string[]): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(256, 256);
+    ctx.fillStyle = pal[3];
+    ctx.fillRect(0, 0, 256, 256);
+    // Bold geometric Wynwood-style art blocks & diagonal stripes
+    ctx.fillStyle = pal[0];
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(180, 0);
+    ctx.lineTo(90, 256);
+    ctx.lineTo(0, 256);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = pal[1];
+    ctx.beginPath();
+    ctx.arc(170, 130, 72, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = pal[2];
+    ctx.fillRect(24, 150, 200, 28);
+    ctx.beginPath();
+    ctx.arc(65, 72, 34, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Industrial warehouse window band along top
+    for (let i = 0; i < 4; i++) {
+      ctx.fillStyle = '#1b2b38';
+      ctx.fillRect(16 + i * 60, 18, 42, 32);
+      ctx.strokeStyle = '#dce2e8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16 + i * 60, 18, 42, 32);
+    }
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
+  private createMediterraneanTexture(wall: string): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(256, 256);
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Stone corner quoins
+    ctx.fillStyle = '#d3c2aa';
+    for (let y = 0; y < 256; y += 24) {
+      ctx.fillRect(0, y, 16, 18);
+      ctx.fillRect(240, y, 16, 18);
+    }
+
+    // Arched Mediterranean windows with dark wood shutters
+    for (let r = 0; r < 2; r++) {
+      for (let col = 0; col < 2; col++) {
+        const cx = 68 + col * 120;
+        const cy = 60 + r * 122;
+        ctx.fillStyle = '#5c402c';
+        ctx.fillRect(cx - 32, cy - 16, 12, 58);
+        ctx.fillRect(cx + 20, cy - 16, 12, 58);
+
+        ctx.fillStyle = '#253c4d';
+        ctx.beginPath();
+        ctx.arc(cx, cy - 12, 20, Math.PI, 0);
+        ctx.lineTo(cx + 20, cy + 42);
+        ctx.lineTo(cx - 20, cy + 42);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#f2eadc';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
+  private createSidingTexture(wall: string): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(256, 256);
+    ctx.fillStyle = wall;
+    ctx.fillRect(0, 0, 256, 256);
+    // Clapboard horizontal siding planks
+    for (let y = 0; y < 256; y += 10) {
+      ctx.fillStyle = 'rgba(0,0,0,0.09)';
+      ctx.fillRect(0, y, 256, 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(0, y + 2, 256, 2);
+    }
+    // Windows with shutters
+    for (const cx of [66, 190]) {
+      for (const cy of [48, 162]) {
+        ctx.fillStyle = '#2d4759';
+        ctx.fillRect(cx - 20, cy, 40, 52);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(cx - 20, cy, 40, 52);
+        ctx.fillStyle = '#3c515c';
+        ctx.fillRect(cx - 32, cy, 10, 52);
+        ctx.fillRect(cx + 22, cy, 10, 52);
+      }
+    }
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
+  private createLoftBrickTexture(brickHex: string): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(256, 256);
+    ctx.fillStyle = '#9c938a';
+    ctx.fillRect(0, 0, 256, 256);
+    const base = new THREE.Color(brickHex);
+    for (let r = 0; r < 24; r++) {
+      const off = (r % 2) * 14;
+      for (let col = -1; col < 10; col++) {
+        const shade = base.clone().multiplyScalar(0.82 + Math.random() * 0.35);
+        ctx.fillStyle = `rgb(${Math.floor(shade.r * 255)},${Math.floor(shade.g * 255)},${Math.floor(shade.b * 255)})`;
+        ctx.fillRect(col * 28 + off + 1, r * 11 + 1, 26, 9);
+      }
+    }
+    // Tall black-steel industrial loft windows
+    for (let r = 0; r < 2; r++) {
+      for (let col = 0; col < 3; col++) {
+        const x = 22 + col * 80;
+        const y = 24 + r * 120;
+        ctx.fillStyle = '#213647';
+        ctx.fillRect(x, y, 48, 72);
+        ctx.strokeStyle = '#1d2228';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x, y, 48, 72);
+        ctx.beginPath();
+        ctx.moveTo(x + 24, y);
+        ctx.lineTo(x + 24, y + 72);
+        ctx.moveTo(x, y + 24);
+        ctx.lineTo(x + 48, y + 24);
+        ctx.moveTo(x, y + 48);
+        ctx.lineTo(x + 48, y + 48);
+        ctx.stroke();
+      }
+    }
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
+  private createBillboardTexture(bg: string, title: string, sub: string, col: string): THREE.CanvasTexture {
+    const [c, ctx] = createCanvas(512, 256);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.fillStyle = col;
+    ctx.fillRect(0, 0, 512, 16);
+    ctx.fillRect(0, 240, 512, 16);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 46px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, 256, 122);
+
+    ctx.fillStyle = col;
+    ctx.font = 'bold 20px Inter, sans-serif';
+    ctx.fillText(sub, 256, 166);
+    return this.track(makeTexture(c, 1, 1, true));
+  }
+
   private createAsphaltTexture(): THREE.CanvasTexture {
     const [c, ctx] = createCanvas(512, 512);
     ctx.fillStyle = '#2b2f36';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Subtle aggregate & weathered tonal patches
     for (let i = 0; i < 12; i++) {
       ctx.fillStyle = i % 2 === 0 ? 'rgba(56,62,70,0.22)' : 'rgba(22,25,30,0.22)';
       ctx.beginPath();
@@ -231,14 +495,12 @@ export class TextureFactory {
       ctx.fill();
     }
 
-    // Tire track darkening along lanes
     ctx.fillStyle = 'rgba(18, 20, 24, 0.25)';
     ctx.fillRect(95, 0, 38, 512);
     ctx.fillRect(185, 0, 38, 512);
     ctx.fillRect(290, 0, 38, 512);
     ctx.fillRect(380, 0, 38, 512);
 
-    // Repair tar cracks
     ctx.strokeStyle = 'rgba(16, 18, 21, 0.72)';
     ctx.lineWidth = 2;
     for (let k = 0; k < 6; k++) {
@@ -254,14 +516,13 @@ export class TextureFactory {
       ctx.stroke();
     }
 
-    // Fine mineral grit
     for (let i = 0; i < 14000; i++) {
       const v = 30 + Math.floor(Math.random() * 34);
       ctx.fillStyle = `rgb(${v},${v + 1},${v + 3})`;
       ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
     }
 
-    return this.track(makeTexture(c, 2, 8, true));
+    return this.track(makeTexture(c, 2, 10, true));
   }
 
   private createNoiseRoughnessTexture(
@@ -295,7 +556,6 @@ export class TextureFactory {
         ctx.fillRect(x + 2, y + 2, step - 4, step - 4);
       }
     }
-    // Expansion joints + subtle cracks
     ctx.strokeStyle = '#7e786f';
     ctx.lineWidth = 3;
     for (let i = 0; i <= 512; i += step) {
@@ -308,14 +568,13 @@ export class TextureFactory {
       ctx.lineTo(512, i);
       ctx.stroke();
     }
-    // Tiny grass/moss specks near joints
     for (let i = 0; i < 65; i++) {
       const gx = Math.floor(Math.random() * 8) * step + (Math.random() - 0.5) * 6;
       const gy = Math.random() * 512;
       ctx.fillStyle = 'rgba(72, 108, 56, 0.55)';
       ctx.fillRect(gx, gy, 3, 5);
     }
-    return this.track(makeTexture(c, 2, 18, true));
+    return this.track(makeTexture(c, 2, 22, true));
   }
 
   private createSidewalkBumpTexture(): THREE.CanvasTexture {
@@ -339,16 +598,13 @@ export class TextureFactory {
 
   private createPlazaTileTexture(): THREE.CanvasTexture {
     const [c, ctx] = createCanvas(512, 512);
-    ctx.fillStyle = '#9e978b'; // mortar seam
+    ctx.fillStyle = '#9e978b';
     ctx.fillRect(0, 0, 512, 512);
     const step = 64;
     for (let x = 0; x < 512; x += step) {
       for (let y = 0; y < 512; y += step) {
         const jitter = Math.floor((Math.random() - 0.5) * 14);
-        const r = 188 + jitter;
-        const g = 181 + jitter;
-        const b = 170 + jitter;
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillStyle = `rgb(${188 + jitter},${181 + jitter},${170 + jitter})`;
         ctx.fillRect(x + 2, y + 2, step - 3, step - 3);
       }
     }
@@ -361,7 +617,7 @@ export class TextureFactory {
 
   private createBrickTexture(baseHex: string): THREE.CanvasTexture {
     const [c, ctx] = createCanvas(256, 256);
-    ctx.fillStyle = '#cfc7bc'; // mortar
+    ctx.fillStyle = '#cfc7bc';
     ctx.fillRect(0, 0, 256, 256);
     const rows = 16;
     const cols = 8;
@@ -448,7 +704,7 @@ export class TextureFactory {
     for (let y = 16; y < 512; y += 64) {
       ctx.fillRect(123, y, 10, 36);
     }
-    return this.track(makeTexture(c, 1, 8, true));
+    return this.track(makeTexture(c, 1, 10, true));
   }
 
   private createSkyscraperTextures(
@@ -479,7 +735,6 @@ export class TextureFactory {
         const shade = Math.random();
         ctxDay.fillStyle = shade > 0.72 ? '#5a8ba8' : shade > 0.4 ? baseColor : '#28455c';
         ctxDay.fillRect(wx, wy, ww, wh);
-        // Subtle interior blind / mullion line
         ctxDay.fillStyle = 'rgba(255,255,255,0.16)';
         ctxDay.fillRect(wx, wy, ww, 3);
         if (shade > 0.5) {
@@ -512,7 +767,6 @@ export class TextureFactory {
       ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
     }
 
-    // Horizontal decorative cornice line
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.fillRect(0, 122, 256, 5);
     ctx.fillStyle = 'rgba(0,0,0,0.1)';
@@ -522,16 +776,12 @@ export class TextureFactory {
       for (let col = 0; col < 3; col++) {
         const x = 22 + col * 78;
         const y = 24 + r * 118;
-        // Window recess shadow
         ctx.fillStyle = 'rgba(0,0,0,0.18)';
         ctx.fillRect(x - 3, y - 3, 54, 70);
-        // Glass pane
         ctx.fillStyle = '#2b4459';
         ctx.fillRect(x, y, 48, 64);
-        // Glass reflection diagonal sheen
         ctx.fillStyle = 'rgba(180,220,245,0.22)';
         ctx.fillRect(x + 4, y + 4, 18, 56);
-        // White mullions & sill
         ctx.strokeStyle = '#f2efe9';
         ctx.lineWidth = 4;
         ctx.strokeRect(x, y, 48, 64);
@@ -568,10 +818,8 @@ export class TextureFactory {
       for (let x = 0; x < 256; x++) {
         const u = (x / 256) * Math.PI * 2;
         const v = (y / 256) * Math.PI * 2;
-        const dx =
-          Math.cos(u * 4 + v * 2) * 0.4 + Math.cos(u * 7 - v * 5) * 0.25;
-        const dy =
-          Math.sin(v * 4 + u * 3) * 0.4 + Math.sin(v * 6 + u * 5) * 0.25;
+        const dx = Math.cos(u * 4 + v * 2) * 0.4 + Math.cos(u * 7 - v * 5) * 0.25;
+        const dy = Math.sin(v * 4 + u * 3) * 0.4 + Math.sin(v * 6 + u * 5) * 0.25;
         const idx = (y * 256 + x) * 4;
         img.data[idx] = Math.floor((dx * 0.5 + 0.5) * 255);
         img.data[idx + 1] = Math.floor((dy * 0.5 + 0.5) * 255);

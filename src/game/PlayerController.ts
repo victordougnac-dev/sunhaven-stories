@@ -156,8 +156,8 @@ export class PlayerController {
     this.resolveCollisions('z', colliders);
 
     // World bounds clamp
-    this.position.x = THREE.MathUtils.clamp(this.position.x, -720, 720);
-    this.position.z = THREE.MathUtils.clamp(this.position.z, -720, 720);
+    this.position.x = THREE.MathUtils.clamp(this.position.x, -1080, 1080);
+    this.position.z = THREE.MathUtils.clamp(this.position.z, -1080, 1080);
 
     // Vertical ground clamp
     this.position.y += this.velocity.y * dt;
