@@ -51,6 +51,7 @@ function createContouredProfile(
     }
   }
 
+  const ascending = rings.length < 2 || rings[rings.length - 1].y >= rings[0].y;
   const stride = radialSegs + 1;
   for (let r = 0; r < rings.length - 1; r++) {
     for (let s = 0; s < radialSegs; s++) {
@@ -58,7 +59,11 @@ function createContouredProfile(
       const b = a + 1;
       const c = (r + 1) * stride + s;
       const d = c + 1;
-      indices.push(a, c, b, b, c, d);
+      if (ascending) {
+        indices.push(a, c, b, b, c, d);
+      } else {
+        indices.push(a, b, c, b, d, c);
+      }
     }
   }
 
@@ -198,15 +203,16 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
   chest.position.y = 0.18;
   spine.add(chest);
 
-  // Muscular upper torso / ribcage / broad shoulders
+  // Muscular upper torso / ribcage / natural sloped shoulders
   const torsoMat = appearance.jacketColor !== undefined ? jacketMat : shirtMat;
   const chestGeo = createContouredProfile([
-    { y: 0.0, rx: 0.168, rz: 0.118, oz: 0.008 },
-    { y: 0.12, rx: 0.198, rz: 0.132, oz: 0.012 },
-    { y: 0.23, rx: 0.218, rz: 0.125, oz: 0.006 },
-    { y: 0.295, rx: 0.185, rz: 0.102, oz: 0.0 },
-    { y: 0.33, rx: 0.072, rz: 0.072, oz: 0.0 },
-  ], 20);
+    { y: -0.01, rx: 0.166, rz: 0.116, oz: 0.008 },
+    { y: 0.11, rx: 0.188, rz: 0.128, oz: 0.012 },
+    { y: 0.21, rx: 0.204, rz: 0.122, oz: 0.007 },
+    { y: 0.275, rx: 0.172, rz: 0.104, oz: 0.002 },
+    { y: 0.305, rx: 0.122, rz: 0.088, oz: 0.0 },
+    { y: 0.33, rx: 0.068, rz: 0.068, oz: 0.0 },
+  ], 22);
   const chestMesh = new THREE.Mesh(chestGeo, torsoMat);
   chestMesh.castShadow = true;
   chest.add(chestMesh);
@@ -337,31 +343,35 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     head.add(crown);
   }
 
-  // Seamless Contoured Arms (no bulky ball joints!)
+  // Seamless Contoured Arms (rounded deltoid dome flowing cleanly into chest)
   const makeArm = (side: -1 | 1): [THREE.Group, THREE.Group] => {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.212, 0.235, 0.002);
+    shoulder.position.set(side * 0.188, 0.228, 0.002);
     chest.add(shoulder);
 
     const upperArmGeo = createContouredProfile([
-      { y: 0.02, rx: 0.052, rz: 0.052 },
-      { y: -0.02, rx: 0.056, rz: 0.056 }, // smooth deltoid taper
-      { y: -0.14, rx: 0.048, rz: 0.049 }, // bicep
-      { y: -0.265, rx: 0.039, rz: 0.04 }, // elbow
-    ], 14);
+      { y: 0.042, rx: 0.012, rz: 0.012, ox: -side * 0.014 },
+      { y: 0.025, rx: 0.038, rz: 0.042, ox: -side * 0.006 },
+      { y: -0.008, rx: 0.054, rz: 0.056 },
+      { y: -0.055, rx: 0.052, rz: 0.053 }, // deltoid curve
+      { y: -0.15, rx: 0.046, rz: 0.047 },  // bicep
+      { y: -0.26, rx: 0.038, rz: 0.039 },  // elbow
+      { y: -0.275, rx: 0.022, rz: 0.022 },
+    ], 16);
     const upper = new THREE.Mesh(upperArmGeo, torsoMat);
     upper.castShadow = true;
     shoulder.add(upper);
 
     const elbow = new THREE.Group();
-    elbow.position.y = -0.265;
+    elbow.position.y = -0.262;
     shoulder.add(elbow);
 
     const forearmGeo = createContouredProfile([
-      { y: 0.01, rx: 0.039, rz: 0.04 },
-      { y: -0.07, rx: 0.041, rz: 0.042 }, // forearm muscle
+      { y: 0.018, rx: 0.022, rz: 0.022 },
+      { y: 0.002, rx: 0.038, rz: 0.039 },
+      { y: -0.07, rx: 0.04, rz: 0.041 }, // forearm muscle
       { y: -0.23, rx: 0.028, rz: 0.03 }, // wrist
-    ], 14);
+    ], 16);
     const forearm = new THREE.Mesh(forearmGeo, skinMat);
     forearm.castShadow = true;
     elbow.add(forearm);
@@ -389,10 +399,12 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     hips.add(thigh);
 
     const thighGeo = createContouredProfile([
-      { y: 0.02, rx: 0.084, rz: 0.088 },
+      { y: 0.038, rx: 0.04, rz: 0.04 },
+      { y: 0.012, rx: 0.083, rz: 0.087 },
       { y: -0.14, rx: 0.078, rz: 0.082 },
       { y: -0.32, rx: 0.064, rz: 0.066 },
       { y: -0.43, rx: 0.056, rz: 0.058 },
+      { y: -0.448, rx: 0.035, rz: 0.035 },
     ], 16);
     const upperLeg = new THREE.Mesh(thighGeo, pantsMat);
     upperLeg.castShadow = true;
@@ -403,7 +415,8 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     thigh.add(shin);
 
     const shinGeo = createContouredProfile([
-      { y: 0.01, rx: 0.056, rz: 0.058 },
+      { y: 0.024, rx: 0.036, rz: 0.036 },
+      { y: 0.002, rx: 0.056, rz: 0.058 },
       { y: -0.14, rx: 0.059, rz: 0.064, oz: -0.006 }, // calf curve
       { y: -0.34, rx: 0.044, rz: 0.048 }, // ankle
       { y: -0.42, rx: 0.041, rz: 0.045 },
