@@ -6,6 +6,7 @@ import { AudioManager } from './AudioManager';
 import { TimeManager } from './TimeManager';
 import { WeatherManager } from './WeatherManager';
 import { WorldManager } from './WorldManager';
+import { StreetDetailsManager } from './StreetDetailsManager';
 import { BuildingManager } from './BuildingManager';
 import { PlayerController, type InputState } from './PlayerController';
 import { CameraController } from './CameraController';
@@ -33,6 +34,7 @@ export class GameEngine {
   private timeMgr!: TimeManager;
   private weatherMgr!: WeatherManager;
   private worldMgr!: WorldManager;
+  private streetDetails!: StreetDetailsManager;
   private buildingMgr!: BuildingManager;
   private player!: PlayerController;
   private camCtrl = new CameraController();
@@ -124,15 +126,19 @@ export class GameEngine {
       onToggleMap: () => this.toggleMap(),
     });
 
-    this.ui.setLoading(20, 'Generating coastal PBR textures & water shaders...');
+    this.ui.setLoading(20, 'Generating coastal PBR textures & reflections...');
     await this.nextFrame();
+    this.setupEnvironmentMap();
     const palette = this.texFactory.buildPalette();
 
-    this.ui.setLoading(42, 'Constructing Sunhaven districts, airport & marina...');
+    this.ui.setLoading(42, 'Constructing Sunhaven districts, street details & marina...');
     await this.nextFrame();
     this.timeMgr = new TimeManager(this.scene);
     this.weatherMgr = new WeatherManager(this.scene);
     this.worldMgr = new WorldManager(this.scene, palette);
+    this.streetDetails = new StreetDetailsManager(this.scene, (x, z) =>
+      this.worldMgr.getGroundHeight(x, z)
+    );
 
     this.ui.setLoading(65, 'Spawning articulated character, vehicles & aircraft...');
     await this.nextFrame();
@@ -193,6 +199,7 @@ export class GameEngine {
       onExit: (pos, yaw) => {
         this.ui.flashTransition(() => {
           this.buildingMgr.exitBuilding(this.worldMgr.group);
+          this.streetDetails.group.visible = true;
           this.vehicleCtrl.setVisible(true);
           this.aircraftCtrl.setVisible(true);
           this.npcMgr.setVisible(true);
@@ -226,6 +233,27 @@ export class GameEngine {
     this.animate();
   }
 
+  private setupEnvironmentMap(): void {
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x8ecae6);
+    const sunOrb = new THREE.Mesh(
+      new THREE.SphereGeometry(6, 12, 10),
+      new THREE.MeshBasicMaterial({ color: 0xfff5d6 })
+    );
+    sunOrb.position.set(18, 26, -12);
+    const groundBounce = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshBasicMaterial({ color: 0x5d6d7e })
+    );
+    groundBounce.rotation.x = -Math.PI / 2;
+    groundBounce.position.y = -10;
+    envScene.add(sunOrb, groundBounce);
+    const rt = pmrem.fromScene(envScene, 0.04);
+    this.scene.environment = rt.texture;
+    pmrem.dispose();
+  }
+
   private nextFrame(): Promise<void> {
     return new Promise((r) => requestAnimationFrame(() => r()));
   }
@@ -253,6 +281,7 @@ export class GameEngine {
             this.player.yaw = res.spawnYaw;
             this.player.velocity.set(0, 0, 0);
             if (!b.isRooftopTeleport) {
+              this.streetDetails.group.visible = false;
               this.vehicleCtrl.setVisible(false);
               this.aircraftCtrl.setVisible(false);
               this.npcMgr.setVisible(false);
@@ -418,6 +447,7 @@ export class GameEngine {
     this.timeMgr.setMode(s.timeMode);
     this.weatherMgr.setMode(s.weatherMode);
     this.worldMgr.applyQuality(s.quality, this.renderer, this.timeMgr.sunLight);
+    this.streetDetails.applyQuality(s.quality);
     this.npcMgr.applyQuality(s.quality);
     this.trafficMgr.applyQuality(s.quality);
   }

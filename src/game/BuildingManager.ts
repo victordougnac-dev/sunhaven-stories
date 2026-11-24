@@ -227,8 +227,46 @@ export class BuildingManager {
     this.interiorGroup.add(backLight);
     this.interiorLights.push(backLight);
 
-    // Wall accent strip
+    // Wall accent strip & baseboards
     this.addWallBox(ox, oy + rh - 0.65, oz - rd * 0.5 + 0.3, rw - 1.5, 0.16, 0.12, accentMat, false);
+    this.addWallBox(ox, oy + 0.12, oz - rd * 0.5 + 0.28, rw - 0.5, 0.22, 0.08, woodMat, false);
+
+    // Ceiling light panels
+    const panelMat = new THREE.MeshStandardMaterial({
+      color: 0xfff8eb,
+      emissive: isNightclub ? 0xff4f9a : 0xffeed0,
+      emissiveIntensity: 0.9,
+    });
+    for (const lz of [-3.5, 2.5]) {
+      this.addWallBox(ox, oy + rh - 0.05, oz + lz, 3.6, 0.08, 0.9, panelMat, false);
+    }
+
+    // Framed wall art & interior window with curtains
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2d34, roughness: 0.4 });
+    const artMat = new THREE.MeshStandardMaterial({ color: 0xff8a65, roughness: 0.6 });
+    this.addWallBox(ox - 4.2, oy + 2.3, oz - rd * 0.5 + 0.3, 2.2, 1.5, 0.08, frameMat, false);
+    this.addWallBox(ox - 4.2, oy + 2.3, oz - rd * 0.5 + 0.33, 1.9, 1.2, 0.08, artMat, false);
+
+    // Corner potted tropical plants
+    const potMat = new THREE.MeshStandardMaterial({ color: 0xb8734d, roughness: 0.75 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x3b8c3e, roughness: 0.7 });
+    for (const px of [-rw * 0.5 + 1.1, rw * 0.5 - 1.1]) {
+      const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.62, 10), potMat);
+      pot.position.set(ox + px, oy + 0.31, oz - rd * 0.5 + 1.1);
+      const plant = new THREE.Mesh(new THREE.DodecahedronGeometry(0.65, 1), leafMat);
+      plant.position.set(ox + px, oy + 1.05, oz - rd * 0.5 + 1.1);
+      this.interiorGroup.add(pot, plant);
+    }
+
+    // Center area rug (non-warehouse)
+    if (b.category !== 'warehouse' && b.category !== 'garage' && b.category !== 'bunker') {
+      const rug = new THREE.Mesh(
+        new THREE.BoxGeometry(6.2, 0.04, 4.4),
+        new THREE.MeshStandardMaterial({ color: isNightclub ? 0x2b1b38 : 0x3e6b7e, roughness: 0.95 })
+      );
+      rug.position.set(ox, oy + 0.03, oz + 0.8);
+      this.interiorGroup.add(rug);
+    }
 
     // Exit door mesh + interactable
     const exitDoorPos = new THREE.Vector3(ox, oy + 0.1, oz + rd * 0.5 - 1.1);

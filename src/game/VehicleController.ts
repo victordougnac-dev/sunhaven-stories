@@ -261,18 +261,22 @@ export class VehicleController {
 
     const paintMat = new THREE.MeshStandardMaterial({
       color: spec.color,
-      roughness: 0.25,
-      metalness: 0.65,
+      roughness: 0.18,
+      metalness: 0.72,
+      envMapIntensity: 1.45,
     });
     const cabinMat = new THREE.MeshStandardMaterial({
-      color: 0x17222d,
-      roughness: 0.15,
-      metalness: 0.85,
+      color: 0x162634,
+      roughness: 0.08,
+      metalness: 0.9,
+      transparent: true,
+      opacity: 0.78,
+      envMapIntensity: 1.6,
     });
     const trimMat = new THREE.MeshStandardMaterial({
       color: isSecret ? 0x1fd1c5 : 0x22262c,
-      roughness: 0.5,
-      metalness: 0.4,
+      roughness: 0.48,
+      metalness: 0.45,
       emissive: isSecret ? 0x1fd1c5 : 0x000000,
       emissiveIntensity: isSecret ? 0.65 : 0,
     });
@@ -342,17 +346,55 @@ export class VehicleController {
       chassis.receiveShadow = true;
       bodyGroup.add(chassis);
 
-      // Cabin
+      // Cabin + interior dashboard & seats visible through tinted windows
       const cabinLen = spec.kind === 'van' ? spec.length * 0.78 : spec.kind === 'pickup' ? spec.length * 0.38 : spec.length * 0.52;
       const cabinZ = spec.kind === 'pickup' ? -0.45 : spec.kind === 'van' ? 0.25 : 0.15;
       const cabinH = spec.kind === 'sports' ? 0.48 : 0.62;
+      const cabinY = chassisY + chassisH * 0.5 + cabinH * 0.45;
       const cabin = new THREE.Mesh(
         new THREE.BoxGeometry(spec.width * 0.84, cabinH, cabinLen),
         cabinMat
       );
-      cabin.position.set(0, chassisY + chassisH * 0.5 + cabinH * 0.45, cabinZ);
+      cabin.position.set(0, cabinY, cabinZ);
       cabin.castShadow = true;
       bodyGroup.add(cabin);
+
+      const roofCap = new THREE.Mesh(
+        new THREE.BoxGeometry(spec.width * 0.82, 0.08, cabinLen * 0.86),
+        paintMat
+      );
+      roofCap.position.set(0, cabinY + cabinH * 0.48, cabinZ);
+      bodyGroup.add(roofCap);
+
+      const dash = new THREE.Mesh(
+        new THREE.BoxGeometry(spec.width * 0.74, 0.22, 0.4),
+        trimMat
+      );
+      dash.position.set(0, chassisY + chassisH * 0.5 + 0.12, cabinZ - cabinLen * 0.32);
+      bodyGroup.add(dash);
+
+      // Side Mirrors & Door Handles
+      for (const side of [-1, 1]) {
+        const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.16), paintMat);
+        mirror.position.set(side * (spec.width * 0.52), chassisY + chassisH * 0.5 + 0.08, cabinZ - cabinLen * 0.28);
+        bodyGroup.add(mirror);
+
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.22), trimMat);
+        handle.position.set(side * (spec.width * 0.51), chassisY + 0.18, cabinZ);
+        bodyGroup.add(handle);
+      }
+
+      // Front Grille & Rear License Plate
+      const grille = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.46, 0.2, 0.08), trimMat);
+      grille.position.set(0, chassisY - 0.02, -spec.length * 0.5 - 0.02);
+      bodyGroup.add(grille);
+
+      const plate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.46, 0.16, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0xf4f1de, roughness: 0.4 })
+      );
+      plate.position.set(0, chassisY - 0.08, spec.length * 0.5 + 0.03);
+      bodyGroup.add(plate);
 
       if (spec.kind === 'sports') {
         const spoiler = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.92, 0.1, 0.36), trimMat);

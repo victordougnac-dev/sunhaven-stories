@@ -358,6 +358,35 @@ export class WorldManager {
       }
     }
 
+    // Urban plaza pavers covering city blocks (excluding Central Park grass & Beach)
+    const blockSpecs: [number, number, number, number][] = [
+      [-120, -180, 102, 102], // NW Downtown
+      [0, -180, 102, 102],    // North Downtown
+      [-120, -60, 102, 102],  // Bayside North
+      [-120, 60, 102, 102],   // Bayside South
+      [-120, 180, 102, 102],  // Neon Mile West
+      [0, 60, 102, 102],      // Downtown South
+      [0, 180, 102, 102],     // Neon Mile East
+    ];
+    for (const [bx, bz, bw, bd] of blockSpecs) {
+      const tileSlab = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.08, bd), this.palette.plazaTile);
+      tileSlab.position.set(bx, 0.145, bz);
+      tileSlab.receiveShadow = true;
+      roadGroup.add(tileSlab);
+    }
+
+    // Narrow mid-block asphalt service alleys in Bayside & Neon Mile
+    for (const [ax, az, aw, ad] of [
+      [-120, -20, 6.5, 195],
+      [-120, 180, 6.5, 95],
+      [0, -180, 6.5, 95],
+    ] as [number, number, number, number][]) {
+      const alley = new THREE.Mesh(new THREE.BoxGeometry(aw, 0.11, ad), this.palette.asphalt);
+      alley.position.set(ax, 0.16, az);
+      alley.receiveShadow = true;
+      roadGroup.add(alley);
+    }
+
     this.group.add(roadGroup);
   }
 
@@ -372,14 +401,22 @@ export class WorldManager {
   ): void {
     const g = new THREE.Group();
     const mat = this.palette.glassTowerDay[styleIdx % this.palette.glassTowerDay.length];
+    const trimMat = this.palette.concreteTrim;
 
-    // Podium base
-    const podiumH = Math.min(8, h * 0.2);
-    const podium = new THREE.Mesh(new THREE.BoxGeometry(w + 2, podiumH, d + 2), mat);
+    // Ground-floor stone podium + recessed lobby glazing
+    const podiumH = Math.min(8.5, h * 0.18);
+    const podium = new THREE.Mesh(new THREE.BoxGeometry(w + 2.2, podiumH, d + 2.2), trimMat);
     podium.position.set(x, podiumH * 0.5 + 0.15, z);
     podium.castShadow = true;
     podium.receiveShadow = true;
     g.add(podium);
+
+    const lobbyGlass = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 2.3, podiumH * 0.58, d + 2.3),
+      new THREE.MeshStandardMaterial({ color: 0x1b3344, roughness: 0.14, metalness: 0.8, envMapIntensity: 1.4 })
+    );
+    lobbyGlass.position.set(x, podiumH * 0.4 + 0.15, z);
+    g.add(lobbyGlass);
 
     // Main shaft
     const shaft = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -388,26 +425,43 @@ export class WorldManager {
     shaft.receiveShadow = true;
     g.add(shaft);
 
-    // Upper setback crown
+    // Horizontal architectural cornice ledges
+    for (let ly = 16; ly < h - 4; ly += 18) {
+      const ledge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.7, 0.55, d + 0.7), trimMat);
+      ledge.position.set(x, ly, z);
+      g.add(ledge);
+    }
+
+    // Upper setback crown + rooftop equipment
+    const topY = h > 36 ? h + h * 0.22 + 0.15 : h + 0.15;
     if (h > 36) {
-      const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, h * 0.22, d * 0.72), mat);
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.74, h * 0.22, d * 0.74), mat);
       crown.position.set(x, h + h * 0.11 + 0.15, z);
       crown.castShadow = true;
       g.add(crown);
 
-      // Rooftop HVAC & spire
+      const parapet = new THREE.Mesh(new THREE.BoxGeometry(w * 0.76, 1.1, d * 0.76), trimMat);
+      parapet.position.set(x, topY + 0.45, z);
+      g.add(parapet);
+
       const spire = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.18, 0.35, 10, 6),
-        new THREE.MeshStandardMaterial({ color: 0xbac7d5, metalness: 0.7, roughness: 0.3 })
+        new THREE.CylinderGeometry(0.16, 0.36, 11, 6),
+        new THREE.MeshStandardMaterial({ color: 0xbac7d5, metalness: 0.75, roughness: 0.28 })
       );
-      spire.position.set(x, h + h * 0.22 + 5, z);
+      spire.position.set(x, topY + 5.5, z);
       g.add(spire);
     }
+
+    // Rooftop HVAC chillers
+    const hvacMat = new THREE.MeshStandardMaterial({ color: 0x6f7b85, roughness: 0.5, metalness: 0.55 });
+    const hvac = new THREE.Mesh(new THREE.BoxGeometry(w * 0.26, 1.8, d * 0.22), hvacMat);
+    hvac.position.set(x + w * 0.18, topY + 0.9, z - d * 0.15);
+    g.add(hvac);
 
     this.addCollider(x, h * 0.5, z, w + 1.8, h + 12, d + 1.8, 'building');
 
     if (entry) {
-      const { pos, yaw } = this.attachEntranceMarker(g, x, 0.18, z, w + 2, d + 2, entry.doorSide, entry.name);
+      const { pos, yaw } = this.attachEntranceMarker(g, x, 0.18, z, w + 2.2, d + 2.2, entry.doorSide, entry.name);
       this.buildingEntries.push({
         id: entry.id,
         name: entry.name,
@@ -432,17 +486,67 @@ export class WorldManager {
     stuccoIdx: number,
     pitchedRoof: boolean,
     neonColor?: number,
-    entry?: Omit<BuildingEntryDef, 'doorPos' | 'doorYaw'> & { doorSide: 'N' | 'S' | 'E' | 'W' }
+    entry?: Omit<BuildingEntryDef, 'doorPos' | 'doorYaw'> & { doorSide: 'N' | 'S' | 'E' | 'W' },
+    useBrick = false
   ): void {
     const baseY = this.getGroundHeight(x, z);
     const g = new THREE.Group();
-    const mat = this.palette.stuccoMaterials[stuccoIdx % this.palette.stuccoMaterials.length];
+    const mat = useBrick
+      ? this.palette.brickWall
+      : this.palette.stuccoMaterials[stuccoIdx % this.palette.stuccoMaterials.length];
+    const trimMat = this.palette.concreteTrim;
 
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     body.position.set(x, baseY + h * 0.5, z);
     body.castShadow = true;
     body.receiveShadow = true;
     g.add(body);
+
+    // Base plinth & shopfront window strip on commercial buildings
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(w + 0.35, 0.55, d + 0.35), trimMat);
+    plinth.position.set(x, baseY + 0.28, z);
+    g.add(plinth);
+
+    if (!pitchedRoof && h >= 7.5) {
+      // Ground-floor architectural pilasters & recessed storefront glazing bays
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: 0x224157,
+        roughness: 0.14,
+        metalness: 0.72,
+        envMapIntensity: 1.4,
+      });
+      for (const offset of [-0.28, 0.28]) {
+        const bayNS = new THREE.Mesh(new THREE.BoxGeometry(w * 0.34, 2.35, d + 0.14), glassMat);
+        bayNS.position.set(x + offset * w, baseY + 1.75, z);
+        g.add(bayNS);
+
+        const bayEW = new THREE.Mesh(new THREE.BoxGeometry(w + 0.14, 2.35, d * 0.34), glassMat);
+        bayEW.position.set(x, baseY + 1.75, z + offset * d);
+        g.add(bayEW);
+      }
+
+      const awningMat = new THREE.MeshStandardMaterial({
+        color: stuccoIdx % 3 === 0 ? 0xd9534f : stuccoIdx % 3 === 1 ? 0x1a7f8e : 0xe09f3e,
+        roughness: 0.72,
+      });
+      const awning = new THREE.Mesh(new THREE.BoxGeometry(w + 0.7, 0.22, d + 0.7), awningMat);
+      awning.position.set(x, baseY + 3.25, z);
+      awning.castShadow = true;
+      g.add(awning);
+
+      // Upper floor balcony ledge
+      if (h >= 10) {
+        const balc = new THREE.Mesh(new THREE.BoxGeometry(w + 1.1, 0.25, d + 1.1), trimMat);
+        balc.position.set(x, baseY + 6.4, z);
+        g.add(balc);
+      }
+    }
+
+    // Wall-mounted AC unit & vent pipe
+    const acMat = new THREE.MeshStandardMaterial({ color: 0xc2c8cc, roughness: 0.5, metalness: 0.35 });
+    const acUnit = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.58, 0.45), acMat);
+    acUnit.position.set(x + w * 0.28, baseY + Math.min(h - 1.2, 4.4), z - d * 0.5 - 0.22);
+    g.add(acUnit);
 
     if (pitchedRoof) {
       const roofMat = new THREE.MeshStandardMaterial({
@@ -455,12 +559,14 @@ export class WorldManager {
       roof.castShadow = true;
       g.add(roof);
     } else {
-      const trim = new THREE.Mesh(
-        new THREE.BoxGeometry(w + 0.8, 0.6, d + 0.8),
-        new THREE.MeshStandardMaterial({ color: 0xe6e0d4, roughness: 0.6 })
-      );
-      trim.position.set(x, baseY + h + 0.3, z);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.7, 0.75, d + 0.7), trimMat);
+      trim.position.set(x, baseY + h + 0.35, z);
       g.add(trim);
+
+      // Rooftop HVAC vent box
+      const vent = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 1.8), acMat);
+      vent.position.set(x - w * 0.18, baseY + h + 1.1, z);
+      g.add(vent);
     }
 
     if (neonColor !== undefined) {
@@ -470,8 +576,8 @@ export class WorldManager {
         emissiveIntensity: 1.5,
       });
       this.neonSignMats.push(signMat);
-      const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.65, 1.3, 0.35), signMat);
-      sign.position.set(x, baseY + h * 0.72, z + d * 0.5 + 0.25);
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(w * 0.65, 1.1, 0.35), signMat);
+      sign.position.set(x, baseY + h * 0.74, z + d * 0.5 + 0.25);
       g.add(sign);
     }
 
@@ -598,7 +704,7 @@ export class WorldManager {
     roofDeck.position.set(-26, 95.3, -180);
     this.group.add(roofDeck);
 
-    // More varied downtown towers
+    // More varied downtown towers & dense perimeter mid-rises
     this.addSkyscraper(-96, -180, 26, 24, 58, 2, {
       id: 'grand_hotel',
       name: 'Sunhaven Grand Hotel',
@@ -606,12 +712,24 @@ export class WorldManager {
       district: 'downtown',
       doorSide: 'S',
     });
-    this.addSkyscraper(-140, -176, 22, 22, 42, 3);
+    this.addSkyscraper(-144, -178, 22, 22, 42, 3);
+    this.addCoastalBuilding(-150, -212, 20, 16, 16, 4, false, undefined, undefined, true);
+    this.addCoastalBuilding(-96, -212, 22, 16, 19, 1, false);
+    this.addCoastalBuilding(-148, -146, 20, 14, 14, 2, false);
+    this.addCoastalBuilding(-26, -212, 22, 16, 24, 0, false, undefined, undefined, true);
+    this.addCoastalBuilding(22, -212, 22, 16, 21, 5, false);
+
     this.addSkyscraper(24, 56, 24, 24, 52, 0);
     this.addSkyscraper(-24, 56, 24, 24, 68, 2);
+    this.addCoastalBuilding(-24, 92, 22, 15, 16, 3, false, 0x45b7d1, undefined, true);
+    this.addCoastalBuilding(24, 92, 22, 15, 18, 0, false);
+    this.addCoastalBuilding(-24, 24, 20, 14, 15, 5, false);
+    this.addCoastalBuilding(24, 24, 20, 14, 14, 2, false, undefined, undefined, true);
+
     this.addSkyscraper(-96, -60, 24, 24, 46, 3);
 
-    // Bayside Promenade shops & cafes (x in [-165..-75], z in [-105..105])
+    // Bayside Promenade dense connected storefronts & apartments (x in [-165..-75], z in [-105..105])
+    this.addCoastalBuilding(-152, -88, 18, 22, 13.5, 4, false, undefined, undefined, true);
     this.addCoastalBuilding(-146, -54, 18, 15, 8.5, 1, false, 0x1fd1c5, {
       id: 'sunset_cafe',
       name: 'Sunset Cafe & Bistro',
@@ -627,8 +745,14 @@ export class WorldManager {
       doorSide: 'E',
     });
     this.addCoastalBuilding(-146, 24, 17, 15, 9, 0, true);
+    this.addCoastalBuilding(-150, 56, 18, 20, 12, 3, false);
+    this.addCoastalBuilding(-150, 88, 18, 20, 14.5, 5, false, undefined, undefined, true);
+
     this.addCoastalBuilding(-96, 28, 18, 16, 11, 4, false);
     this.addCoastalBuilding(-96, -22, 16, 14, 9.5, 5, false);
+    this.addCoastalBuilding(-90, 60, 18, 20, 13, 1, false, undefined, undefined, true);
+    this.addCoastalBuilding(-90, 90, 18, 20, 15, 6, false);
+    this.addCoastalBuilding(-92, -92, 18, 18, 12.5, 0, false);
 
     // Downtown Subway / Underground Bunker Stairs near (-72, -62)
     this.addCoastalBuilding(-72, -64, 8, 8, 4.2, 6, false, 0x1fd1c5, {
@@ -656,14 +780,14 @@ export class WorldManager {
   }
 
   private buildNeonMile(): void {
-    // Nightlife strip (x in [-165..45], z in [75..225])
+    // Nightlife strip (x in [-165..45], z in [75..225]) - keep (-142, 178) alley open!
     this.addCoastalBuilding(-142, 162, 24, 20, 11, 6, false, 0xff477e, {
       id: 'neon_pulse_club',
       name: 'Neon Pulse Nightclub',
       category: 'nightclub',
       district: 'neon_mile',
       doorSide: 'N',
-    });
+    }, true);
     this.addCoastalBuilding(-96, 168, 22, 16, 10, 7, false, 0x1fd1c5, {
       id: 'motel_sol',
       name: 'Motel Sol Lobby',
@@ -671,9 +795,12 @@ export class WorldManager {
       district: 'neon_mile',
       doorSide: 'N',
     });
-    this.addCoastalBuilding(-24, 165, 22, 18, 13, 3, false, 0xffb84d);
+    this.addCoastalBuilding(-24, 165, 22, 18, 13, 3, false, 0xffb84d, undefined, true);
     this.addCoastalBuilding(24, 165, 20, 18, 12, 1, false, 0xff6b4a);
     this.addCoastalBuilding(-142, 205, 18, 16, 9, 5, false, 0x45b7d1);
+    this.addCoastalBuilding(-96, 206, 20, 16, 12, 2, false, 0xff6b4a, undefined, true);
+    this.addCoastalBuilding(-24, 206, 20, 16, 14, 4, false, 0x1fd1c5);
+    this.addCoastalBuilding(24, 206, 20, 16, 11, 6, false, 0xff477e, undefined, true);
   }
 
   private buildSuburbsAndCoralHeights(): void {
@@ -682,9 +809,13 @@ export class WorldManager {
       [95, -200, 0], [140, -200, 1], [95, -158, 2], [140, -158, 3],
       [95, -80, 4], [140, -80, 5], [95, -35, 6], [140, -35, 7],
       [95, 36, 0], [140, 36, 1], [95, 82, 2], [140, 82, 3],
+      [215, -200, 1], [260, -200, 3], [215, -158, 5], [260, -158, 7],
       [215, -80, 4], [260, -80, 5], [215, -35, 6], [260, -35, 7],
-      [215, 36, 0], [260, 36, 2],
+      [215, 36, 0], [260, 36, 2], [215, 82, 4], [260, 82, 6],
     ];
+    const fenceMat = new THREE.MeshStandardMaterial({ color: 0xebe6dc, roughness: 0.75 });
+    const mailMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
+
     houseSpots.forEach(([hx, hz, idx], i) => {
       this.addCoastalBuilding(
         hx,
@@ -703,8 +834,21 @@ export class WorldManager {
               district: 'suburbs',
               doorSide: 'S',
             }
-          : undefined
+          : undefined,
+        i % 5 === 2
       );
+
+      // Suburban yard fences & curbside mailbox
+      const gy = this.getGroundHeight(hx, hz);
+      const fence = new THREE.Mesh(new THREE.BoxGeometry(18, 0.9, 0.22), fenceMat);
+      fence.position.set(hx, gy + 0.45, hz - 9.5);
+      this.group.add(fence);
+
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.1, 0.18), fenceMat);
+      post.position.set(hx - 10, gy + 0.55, hz + 8);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.25, 0.48), mailMat);
+      box.position.set(hx - 10, gy + 1.12, hz + 8);
+      this.group.add(post, box);
     });
 
     // Coral Heights Luxury Villas (elevated hillside)
@@ -1040,6 +1184,52 @@ export class WorldManager {
     this.group.add(ruinPillar);
   }
 
+  private createPalmCrownGeometry(): THREE.BufferGeometry {
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const indices: number[] = [];
+    const frondCount = 7;
+    const segs = 4;
+    let vOffset = 0;
+
+    for (let f = 0; f < frondCount; f++) {
+      const ang = (f / frondCount) * Math.PI * 2;
+      const cos = Math.cos(ang);
+      const sin = Math.sin(ang);
+      const px = -sin;
+      const pz = cos;
+
+      for (let s = 0; s <= segs; s++) {
+        const t = s / segs;
+        const r = t * 3.8;
+        const y = Math.sin(t * Math.PI * 0.65) * 0.9 - t * t * 1.45;
+        const halfW = (1 - t * 0.85) * 0.48;
+
+        const cx = cos * r;
+        const cz = sin * r;
+        positions.push(cx - px * halfW, y, cz - pz * halfW);
+        positions.push(cx + px * halfW, y, cz + pz * halfW);
+        normals.push(0, 1, 0, 0, 1, 0);
+      }
+
+      for (let s = 0; s < segs; s++) {
+        const a = vOffset + s * 2;
+        const b = a + 1;
+        const c = a + 2;
+        const d = a + 3;
+        indices.push(a, c, b, b, c, d);
+      }
+      vOffset += (segs + 1) * 2;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
   private buildVegetationAndLights(): void {
     // Collect palm tree coordinates along beach, park, suburbs, roads, island
     const spots: THREE.Vector3[] = [];
@@ -1067,13 +1257,17 @@ export class WorldManager {
       spots.push(new THREE.Vector3(-520 + Math.cos(a) * 26, 0, 120 + Math.sin(a) * 26));
     }
 
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.42, 8.5, 6);
+    const trunkGeo = new THREE.CylinderGeometry(0.2, 0.42, 8.6, 8);
     const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7c5b41, roughness: 0.9 });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
     trunks.castShadow = true;
 
-    const frondGeo = new THREE.ConeGeometry(3.2, 2.2, 6);
-    const frondMat = new THREE.MeshStandardMaterial({ color: 0x3b8c3e, roughness: 0.75 });
+    const frondGeo = this.createPalmCrownGeometry();
+    const frondMat = new THREE.MeshStandardMaterial({
+      color: 0x3b8c3e,
+      roughness: 0.72,
+      side: THREE.DoubleSide,
+    });
     this.palmFrondsInstanced = new THREE.InstancedMesh(frondGeo, frondMat, spots.length);
     this.palmFrondsInstanced.castShadow = true;
 
@@ -1087,8 +1281,8 @@ export class WorldManager {
       trunks.setMatrixAt(idx, this.dummy.matrix);
 
       this.dummy.position.set(p.x + 0.3, y + 8.3 * scale, p.z);
-      this.dummy.rotation.set(Math.PI, idx * 0.9, 0);
-      this.dummy.scale.set(scale * 1.15, scale * 0.85, scale * 1.15);
+      this.dummy.rotation.set(0, idx * 0.9, 0);
+      this.dummy.scale.setScalar(scale);
       this.dummy.updateMatrix();
       this.palmFrondsInstanced.setMatrixAt(idx, this.dummy.matrix);
       this.palmBaseMatrices.push(this.dummy.matrix.clone());

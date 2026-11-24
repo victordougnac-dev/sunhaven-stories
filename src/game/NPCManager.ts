@@ -126,6 +126,27 @@ export class NPCManager {
           sunglasses: idx % 3 === 0,
         });
 
+        const scaleH = 0.93 + ((idx * 13 + k * 7) % 15) * 0.01;
+        const scaleW = 0.94 + ((idx * 7 + k * 11) % 12) * 0.012;
+        rig.root.scale.set(scaleW, scaleH, scaleW);
+
+        // Give some NPCs handheld phone or shopping bag
+        if ((idx + k) % 3 === 0) {
+          const bag = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.26, 0.12),
+            new THREE.MeshStandardMaterial({ color: (idx % 2 === 0) ? 0xff6b4a : 0x1fd1c5, roughness: 0.7 })
+          );
+          bag.position.set(0, -0.34, 0.02);
+          rig.forearmR.add(bag);
+        } else if ((idx + k) % 4 === 1) {
+          const phone = new THREE.Mesh(
+            new THREE.BoxGeometry(0.06, 0.12, 0.015),
+            new THREE.MeshStandardMaterial({ color: 0x11151c, emissive: 0x64b5f6, emissiveIntensity: 0.7 })
+          );
+          phone.position.set(0, -0.27, 0.06);
+          rig.forearmL.add(phone);
+        }
+
         const sx = THREE.MathUtils.lerp(r.x1, r.x2, t);
         const sz = THREE.MathUtils.lerp(r.z1, r.z2, t);
         const sy = getGroundHeight(sx, sz);
