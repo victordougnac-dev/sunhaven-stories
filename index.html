@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="Sunhaven Stories — A 3D Open-World Tropical Coastal City Adventure for CrazyGames. Explore districts, enter buildings, drive vehicles, fly aircraft, and uncover 16 hidden secrets." />
+    <title>Sunhaven Stories — Open World 3D</title>
+  </head>
+  <body>
+    <div id="game-root">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Loading Screen (visible immediately so never blank) -->
+      <div id="loading-screen" class="overlay-screen active">
+        <div class="loading-backdrop"></div>
+        <div class="loading-card">
+          <div class="brand-emblem">SUNHAVEN</div>
+          <h1 class="game-title">SUNHAVEN STORIES</h1>
+          <p class="game-subtitle">OPEN-WORLD COASTAL METROPOLIS</p>
+          <div class="progress-track">
+            <div id="loading-bar" class="progress-fill" style="width: 8%"></div>
+          </div>
+          <div id="loading-status" class="loading-status">Initializing 3D coastal engine...</div>
+          <div id="loading-tip" class="loading-tip">Tip: Visit Sunhaven International Airport on the east side to fly planes and helicopters.</div>
+        </div>
+      </div>
+
+      <!-- Main Menu Overlay -->
+      <div id="main-menu" class="overlay-screen">
+        <div class="menu-gradient"></div>
+        <div class="menu-container">
+          <div class="menu-hero">
+            <span class="edition-tag">OPEN-WORLD 3D EDITION</span>
+            <h1 class="menu-title">SUNHAVEN<br /><span>STORIES</span></h1>
+            <p class="menu-tagline">Explore a living tropical metropolis by foot, car, boat, and aircraft. Enter buildings, take on coastal challenges, and uncover 16 hidden mysteries.</p>
+            <div class="menu-actions">
+              <button id="btn-play" class="btn-primary">
+                <span class="btn-label">ENTER SUNHAVEN</span>
+                <span class="btn-sub" id="btn-play-sub">Start New Story</span>
+              </button>
+              <div class="menu-secondary-row">
+                <button id="btn-menu-settings" class="btn-secondary">Settings</button>
+                <button id="btn-menu-controls" class="btn-secondary">Controls</button>
+                <button id="btn-menu-credits" class="btn-secondary">Credits</button>
+              </div>
+            </div>
+          </div>
+          <div class="menu-stats-panel" id="menu-stats-panel">
+            <h3>CITY PROGRESS</h3>
+            <div class="stat-row"><span>Districts Discovered</span><strong id="menu-stat-districts">0 / 12</strong></div>
+            <div class="stat-row"><span>Secrets Found</span><strong id="menu-stat-secrets">0 / 16</strong></div>
+            <div class="stat-row"><span>Missions Completed</span><strong id="menu-stat-missions">0 / 6</strong></div>
+            <div class="stat-row"><span>Bank Balance</span><strong id="menu-stat-cash">$500</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- In-Game HUD -->
+      <div id="hud" class="hud hidden">
+        <!-- Top Left: Minimap -->
+        <div class="hud-top-left">
+          <div class="minimap-frame">
+            <canvas id="minimap-canvas" width="184" height="184"></canvas>
+            <div class="minimap-compass" id="minimap-north">N</div>
+          </div>
+          <div class="hud-location-pill">
+            <span id="hud-district">Downtown Sunhaven</span>
+            <span class="dot">•</span>
+            <span id="hud-time">12:00</span>
+            <span class="dot">•</span>
+            <span id="hud-weather">Sunny</span>
+          </div>
+        </div>
+
+        <!-- Top Right: Stats, Mission & Fullscreen -->
+        <div class="hud-top-right">
+          <div class="hud-status-bar">
+            <div class="hud-chip cash-chip" id="hud-cash">$500</div>
+            <div class="hud-chip secret-chip" id="hud-secrets">0 / 16 Secrets</div>
+            <button id="btn-open-map" class="hud-icon-btn" title="City Map (M)">MAP [M]</button>
+            <button id="btn-fullscreen" class="hud-icon-btn" title="Toggle Fullscreen">FULL</button>
+            <button id="btn-pause" class="hud-icon-btn" title="Pause (ESC)">II</button>
+          </div>
+          <div id="mission-panel" class="mission-panel hidden">
+            <div class="mission-header">
+              <span class="mission-badge" id="mission-badge">ACTIVE ACTIVITY</span>
+              <button id="btn-abort-mission" class="mission-abort" title="Cancel Activity">✕</button>
+            </div>
+            <div id="mission-title" class="mission-title">Downtown Circuit</div>
+            <div id="mission-objective" class="mission-objective">Pass checkpoint 1/8</div>
+            <div id="mission-timer" class="mission-timer">00:45.2</div>
+          </div>
+        </div>
+
+        <!-- Center: Crosshair / Photo Mode / District Banner / Toast -->
+        <div id="crosshair" class="crosshair"></div>
+        <div id="photo-overlay" class="photo-overlay hidden">
+          <div class="photo-frame">
+            <span class="photo-corner tl"></span><span class="photo-corner tr"></span>
+            <span class="photo-corner bl"></span><span class="photo-corner br"></span>
+            <div class="photo-hint">LEFT CLICK TO SNAP PHOTO • [C] EXIT CAMERA</div>
+          </div>
+        </div>
+        <div id="district-banner" class="district-banner hidden">
+          <div class="district-banner-sub">ENTERING DISTRICT</div>
+          <div id="district-banner-name" class="district-banner-name">PALM BEACH</div>
+        </div>
+        <div id="toast-container" class="toast-container"></div>
+
+        <!-- Interaction Prompt -->
+        <div id="interaction-prompt" class="interaction-prompt hidden">
+          <span class="key-cap" id="prompt-key">E</span>
+          <span id="prompt-text">Enter Sunset Cafe</span>
+        </div>
+
+        <!-- Dialogue Box -->
+        <div id="dialogue-box" class="dialogue-box hidden">
+          <div class="dialogue-speaker" id="dialogue-speaker">Local Resident</div>
+          <div class="dialogue-text" id="dialogue-text"></div>
+          <div class="dialogue-footer">Press [E] or Click to continue</div>
+        </div>
+
+        <!-- Bottom Right: Vehicle / Aircraft HUD -->
+        <div id="vehicle-hud" class="vehicle-hud hidden">
+          <div class="vehicle-name" id="hud-vehicle-name">Solaris GT</div>
+          <div class="speed-readout">
+            <span id="hud-speed">0</span>
+            <span class="speed-unit" id="hud-speed-unit">KM/H</span>
+          </div>
+          <div class="vehicle-meta">
+            <span id="hud-gear">DRIVE</span>
+            <span id="hud-altitude" class="hidden">ALT 0m</span>
+          </div>
+        </div>
+
+        <!-- Bottom Left: Compact Controls Hint -->
+        <div id="controls-strip" class="controls-strip">
+          <span><b>WASD</b> Move</span>
+          <span><b>SHIFT</b> Sprint</span>
+          <span><b>SPACE</b> Jump</span>
+          <span><b>E</b> Interact</span>
+          <span><b>F</b> Vehicle</span>
+          <span><b>M</b> Map</span>
+          <span><b>C</b> Camera</span>
+          <span><b>ESC</b> Pause</span>
+        </div>
+      </div>
+
+      <!-- Interactive Fullscreen Map Overlay -->
+      <div id="map-modal" class="modal-screen hidden">
+        <div class="modal-panel map-panel">
+          <div class="modal-header">
+            <div>
+              <h2>SUNHAVEN CITY MAP</h2>
+              <p class="modal-subtitle">Drag to pan • Scroll to zoom • Click to place GPS waypoint</p>
+            </div>
+            <div class="map-legend">
+              <span class="legend-item"><i class="dot player"></i>You</span>
+              <span class="legend-item"><i class="dot building"></i>Interiors</span>
+              <span class="legend-item"><i class="dot mission"></i>Activities</span>
+              <span class="legend-item"><i class="dot vehicle"></i>Vehicles/Air</span>
+              <span class="legend-item"><i class="dot secret"></i>Secrets</span>
+            </div>
+            <button id="btn-close-map" class="btn-close">Close [M]</button>
+          </div>
+          <div class="map-body">
+            <canvas id="world-map-canvas"></canvas>
+            <div class="map-sidebar" id="map-sidebar">
+              <h3>SECRETS LOG (<span id="map-secrets-count">0/16</span>)</h3>
+              <div id="secrets-list" class="secrets-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pause Menu -->
+      <div id="pause-modal" class="modal-screen hidden">
+        <div class="modal-panel compact-panel">
+          <h2>GAME PAUSED</h2>
+          <div class="pause-actions">
+            <button id="btn-resume" class="btn-primary">Resume Game</button>
+            <button id="btn-pause-settings" class="btn-secondary">Settings</button>
+            <button id="btn-pause-controls" class="btn-secondary">Controls</button>
+            <button id="btn-pause-save" class="btn-secondary">Save Progress</button>
+            <button id="btn-pause-mainmenu" class="btn-danger">Return to Main Menu</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Modal -->
+      <div id="settings-modal" class="modal-screen hidden">
+        <div class="modal-panel compact-panel">
+          <div class="modal-header">
+            <h2>SETTINGS</h2>
+            <button id="btn-close-settings" class="btn-close">Done</button>
+          </div>
+          <div class="settings-form">
+            <div class="setting-row">
+              <label for="setting-quality">Graphics Quality</label>
+              <select id="setting-quality">
+                <option value="low">Low (High FPS)</option>
+                <option value="medium">Medium</option>
+                <option value="high" selected>High</option>
+                <option value="ultra">Ultra</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label for="setting-volume">Master Volume <span id="val-volume">70%</span></label>
+              <input id="setting-volume" type="range" min="0" max="100" value="70" />
+            </div>
+            <div class="setting-row">
+              <label for="setting-sensitivity">Camera Sensitivity <span id="val-sensitivity">1.0x</span></label>
+              <input id="setting-sensitivity" type="range" min="30" max="250" value="100" />
+            </div>
+            <div class="setting-row">
+              <label for="setting-time">Time of Day</label>
+              <select id="setting-time">
+                <option value="cycle">Dynamic Cycle</option>
+                <option value="sunrise">Sunrise (06:30)</option>
+                <option value="noon">Afternoon (13:00)</option>
+                <option value="sunset">Golden Sunset (18:15)</option>
+                <option value="night">Neon Night (22:30)</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <label for="setting-weather">Weather</label>
+              <select id="setting-weather">
+                <option value="auto">Dynamic Weather</option>
+                <option value="sunny">Sunny</option>
+                <option value="cloudy">Cloudy</option>
+                <option value="rain">Tropical Rain</option>
+                <option value="storm">Coastal Storm</option>
+              </select>
+            </div>
+            <div class="setting-row checkbox-row">
+              <label for="setting-hints">Show On-Screen Control Hints</label>
+              <input id="setting-hints" type="checkbox" checked />
+            </div>
+            <div class="setting-row checkbox-row">
+              <label for="setting-invert-y">Invert Camera Y-Axis</label>
+              <input id="setting-invert-y" type="checkbox" />
+            </div>
+            <div class="setting-footer">
+              <button id="btn-reset-save" class="btn-danger-outline">Reset Saved Progress</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Modal -->
+      <div id="controls-modal" class="modal-screen hidden">
+        <div class="modal-panel compact-panel">
+          <div class="modal-header">
+            <h2>CONTROLS</h2>
+            <button id="btn-close-controls" class="btn-close">Close</button>
+          </div>
+          <div class="controls-grid">
+            <div class="control-section">
+              <h3>On Foot</h3>
+              <div class="ctrl-row"><span>W A S D</span><span>Move</span></div>
+              <div class="ctrl-row"><span>SHIFT</span><span>Sprint</span></div>
+              <div class="ctrl-row"><span>SPACE</span><span>Jump / Swim Up</span></div>
+              <div class="ctrl-row"><span>E</span><span>Enter Building / Talk / Interact</span></div>
+              <div class="ctrl-row"><span>F</span><span>Enter / Exit Vehicle or Aircraft</span></div>
+              <div class="ctrl-row"><span>C</span><span>Photo Camera Mode</span></div>
+              <div class="ctrl-row"><span>Mouse / Drag</span><span>Rotate Camera &amp; Zoom</span></div>
+            </div>
+            <div class="control-section">
+              <h3>Vehicles &amp; Boats</h3>
+              <div class="ctrl-row"><span>W / S</span><span>Accelerate / Brake &amp; Reverse</span></div>
+              <div class="ctrl-row"><span>A / D</span><span>Steer Left / Right</span></div>
+              <div class="ctrl-row"><span>SPACE</span><span>Handbrake / Drift</span></div>
+              <div class="ctrl-row"><span>H</span><span>Horn</span></div>
+              <div class="ctrl-row"><span>L</span><span>Toggle Headlights</span></div>
+              <div class="ctrl-row"><span>F</span><span>Exit Vehicle</span></div>
+            </div>
+            <div class="control-section">
+              <h3>Aircraft &amp; Helicopter</h3>
+              <div class="ctrl-row"><span>SHIFT / CTRL</span><span>Throttle Up / Down</span></div>
+              <div class="ctrl-row"><span>W / S</span><span>Pitch Down / Up (Climb)</span></div>
+              <div class="ctrl-row"><span>A / D</span><span>Roll Left / Right</span></div>
+              <div class="ctrl-row"><span>Q / E</span><span>Yaw Rudder Left / Right</span></div>
+              <div class="ctrl-row"><span>F</span><span>Exit Aircraft (When Landed)</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Credits Modal -->
+      <div id="credits-modal" class="modal-screen hidden">
+        <div class="modal-panel compact-panel">
+          <div class="modal-header">
+            <h2>CREDITS</h2>
+            <button id="btn-close-credits" class="btn-close">Close</button>
+          </div>
+          <div class="credits-body">
+            <h3>SUNHAVEN STORIES</h3>
+            <p>An original 3D open-world browser game built with Three.js, TypeScript, procedural PBR shaders, and Web Audio synthesis — tailored for CrazyGames.</p>
+            <ul>
+              <li><strong>World Design:</strong> 12 distinct districts across Sunhaven</li>
+              <li><strong>Interiors:</strong> 14 fully furnished enterable buildings &amp; underground areas</li>
+              <li><strong>Fleet:</strong> Sports cars, sedans, SUVs, trucks, motorcycles, speedboats, prop planes, private jets &amp; helicopters</li>
+              <li><strong>Secrets:</strong> 16 original hidden Easter eggs to discover</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transition Curtain -->
+      <div id="fade-curtain" class="fade-curtain"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
