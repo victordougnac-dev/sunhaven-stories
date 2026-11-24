@@ -2,6 +2,7 @@ import type { EasterEggDef, GameSettings, Interactable, QualityPreset, TimeMode,
 
 export interface UICallbacks {
   onPlay: () => void;
+  onPause: () => void;
   onResume: () => void;
   onMainMenu: () => void;
   onSave: () => void;
@@ -73,7 +74,7 @@ export class UIManager {
   private bindEvents(): void {
     document.getElementById('btn-play')?.addEventListener('click', () => this.cb.onPlay());
     document.getElementById('btn-resume')?.addEventListener('click', () => this.cb.onResume());
-    document.getElementById('btn-pause')?.addEventListener('click', () => this.showPause(true));
+    document.getElementById('btn-pause')?.addEventListener('click', () => this.cb.onPause());
     document.getElementById('btn-pause-mainmenu')?.addEventListener('click', () => this.cb.onMainMenu());
     document.getElementById('btn-pause-save')?.addEventListener('click', () => this.cb.onSave());
     document.getElementById('btn-abort-mission')?.addEventListener('click', () => this.cb.onAbortMission());

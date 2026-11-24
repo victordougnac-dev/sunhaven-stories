@@ -101,6 +101,7 @@ export class GameEngine {
 
     this.ui = new UIManager(this.saveMgr.data.settings, {
       onPlay: () => this.startGame(),
+      onPause: () => this.setPaused(true),
       onResume: () => this.setPaused(false),
       onMainMenu: () => this.returnToMainMenu(),
       onSave: () => {
@@ -470,16 +471,18 @@ export class GameEngine {
       this.audio.unlock();
 
       const code = e.code;
-      if (code === 'Escape') {
+      if (code === 'Escape' || code === 'KeyP') {
+        if (e.repeat) return;
         if (this.ui.isMapOpen()) {
           this.toggleMap();
+          if (code === 'KeyP') this.setPaused(true);
         } else {
           this.setPaused(!this.paused);
         }
         return;
       }
 
-      if (code === 'KeyM' && !this.paused) {
+      if (code === 'KeyM' && !this.paused && !e.repeat) {
         this.toggleMap();
         return;
       }
