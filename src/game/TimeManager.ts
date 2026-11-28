@@ -236,11 +236,12 @@ export class TimeManager {
       .lerp(new THREE.Color(0xff8e53), sunsetAmount * 0.75)
       .lerp(new THREE.Color(0x6b88c9), this.nightFactor);
     this.sunLight.color.copy(sunColor);
-    this.sunLight.intensity = (0.35 + dayAmount * 2.15) * stormDim;
+    this.sunLight.intensity = (0.18 + dayAmount * 2.45) * stormDim;
 
-    this.hemiLight.color.copy(topCol).lerp(new THREE.Color(0xffffff), 0.45);
-    this.hemiLight.groundColor.setHex(dayAmount > 0.3 ? 0x7c7467 : 0x1a2533);
-    this.hemiLight.intensity = (0.52 + dayAmount * 0.92) * (0.7 + 0.3 * stormDim);
+    this.hemiLight.color.copy(topCol).lerp(new THREE.Color(0xffffff), 0.38);
+    this.hemiLight.groundColor.setHex(dayAmount > 0.3 ? 0x7c7467 : 0x101722);
+    this.hemiLight.intensity = (0.18 + dayAmount * 0.78) * (0.7 + 0.3 * stormDim);
+    scene.environmentIntensity = (0.14 + dayAmount * 0.86) * (0.65 + 0.35 * stormDim);
 
     (this.stars.material as THREE.PointsMaterial).opacity =
       this.nightFactor * (weather === 'sunny' ? 0.9 : 0.25);
