@@ -958,19 +958,6 @@ export class GameEngine {
       }
     }
 
-    // Dynamic wet asphalt reflections during rain/storm
-    const isWet = this.weatherMgr.current === 'rain' || this.weatherMgr.current === 'storm';
-    this.texFactory.palette.asphalt.roughness = THREE.MathUtils.lerp(
-      this.texFactory.palette.asphalt.roughness,
-      isWet ? 0.2 : 0.78,
-      dt * 0.6
-    );
-    this.texFactory.palette.asphalt.metalness = THREE.MathUtils.lerp(
-      this.texFactory.palette.asphalt.metalness,
-      isWet ? 0.35 : 0.08,
-      dt * 0.6
-    );
-
     // Periodic autosave
     this.autoSaveTimer += dt;
     if (this.autoSaveTimer > 20) {

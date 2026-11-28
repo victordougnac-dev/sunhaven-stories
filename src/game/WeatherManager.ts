@@ -9,34 +9,40 @@ export class WeatherManager {
   public wetness = 0;
 
   private weatherTimer = 75;
-  private rainPoints: THREE.Points;
+  private rainLines: THREE.LineSegments;
   private rainPositions: Float32Array;
-  private rainCount = 1600;
+  private rainCount = 1350;
   private lightningTimer = 10;
   private lightningFlash = 0;
   private lightningLight: THREE.PointLight;
 
   constructor(scene: THREE.Scene) {
-    this.rainPositions = new Float32Array(this.rainCount * 3);
+    this.rainPositions = new Float32Array(this.rainCount * 6);
     for (let i = 0; i < this.rainCount; i++) {
-      this.rainPositions[i * 3] = (Math.random() - 0.5) * 90;
-      this.rainPositions[i * 3 + 1] = Math.random() * 48;
-      this.rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 90;
+      const rx = (Math.random() - 0.5) * 90;
+      const ry = Math.random() * 48;
+      const rz = (Math.random() - 0.5) * 90;
+      const idx = i * 6;
+      this.rainPositions[idx] = rx;
+      this.rainPositions[idx + 1] = ry;
+      this.rainPositions[idx + 2] = rz;
+      this.rainPositions[idx + 3] = rx - 0.08;
+      this.rainPositions[idx + 4] = ry + 0.95;
+      this.rainPositions[idx + 5] = rz;
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3));
-    const mat = new THREE.PointsMaterial({
-      color: 0xcbe4ff,
-      size: 0.35,
+    const mat = new THREE.LineBasicMaterial({
+      color: 0xbfe2ff,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.36,
       depthWrite: false,
     });
-    this.rainPoints = new THREE.Points(geo, mat);
-    this.rainPoints.visible = false;
-    this.rainPoints.frustumCulled = false;
-    scene.add(this.rainPoints);
+    this.rainLines = new THREE.LineSegments(geo, mat);
+    this.rainLines.visible = false;
+    this.rainLines.frustumCulled = false;
+    scene.add(this.rainLines);
 
     this.lightningLight = new THREE.PointLight(0xd9ecff, 0, 900);
     scene.add(this.lightningLight);
@@ -73,39 +79,48 @@ export class WeatherManager {
     this.wetness = THREE.MathUtils.lerp(this.wetness, targetWet, dt * 0.4);
     this.windStrength = this.current === 'storm' ? 1.5 : this.current === 'rain' ? 0.9 : 0.4;
 
-    // Make asphalt glossy & reflective when wet!
-    asphaltMat.roughness = THREE.MathUtils.lerp(0.88, 0.22, this.wetness);
-    asphaltMat.metalness = THREE.MathUtils.lerp(0.05, 0.32, this.wetness);
+    // Make asphalt glossy & mirror-like when wet!
+    asphaltMat.roughness = THREE.MathUtils.lerp(0.82, 0.14, this.wetness);
+    asphaltMat.metalness = THREE.MathUtils.lerp(0.08, 0.42, this.wetness);
 
     if (scene.fog instanceof THREE.FogExp2) {
       const targetDensity =
         this.current === 'storm'
-          ? 0.0028
+          ? 0.0026
           : this.current === 'rain'
-          ? 0.0021
+          ? 0.0019
           : this.current === 'cloudy'
-          ? 0.0014
-          : 0.00095;
+          ? 0.0012
+          : 0.00082;
       scene.fog.density = THREE.MathUtils.lerp(scene.fog.density, targetDensity, dt * 0.5);
     }
 
     const showRain = !isInside && (this.current === 'rain' || this.current === 'storm');
-    this.rainPoints.visible = showRain;
+    this.rainLines.visible = showRain;
     if (showRain) {
-      this.rainPoints.position.set(focusPos.x, focusPos.y, focusPos.z);
+      this.rainLines.position.set(focusPos.x, focusPos.y, focusPos.z);
       const speed = this.current === 'storm' ? 46 : 34;
-      const drift = this.current === 'storm' ? 7 : 2;
+      const drift = this.current === 'storm' ? 8 : 2.5;
+      const tailDx = -drift * 0.032;
+      const tailDy = this.current === 'storm' ? 1.25 : 0.95;
       for (let i = 0; i < this.rainCount; i++) {
-        const idx = i * 3;
-        this.rainPositions[idx + 1] -= speed * dt;
-        this.rainPositions[idx] += drift * dt;
-        if (this.rainPositions[idx + 1] < -4) {
-          this.rainPositions[idx + 1] = 44;
-          this.rainPositions[idx] = (Math.random() - 0.5) * 90;
-          this.rainPositions[idx + 2] = (Math.random() - 0.5) * 90;
+        const idx = i * 6;
+        let rx = this.rainPositions[idx] + drift * dt;
+        let ry = this.rainPositions[idx + 1] - speed * dt;
+        let rz = this.rainPositions[idx + 2];
+        if (ry < -4) {
+          ry = 44;
+          rx = (Math.random() - 0.5) * 90;
+          rz = (Math.random() - 0.5) * 90;
         }
+        this.rainPositions[idx] = rx;
+        this.rainPositions[idx + 1] = ry;
+        this.rainPositions[idx + 2] = rz;
+        this.rainPositions[idx + 3] = rx + tailDx;
+        this.rainPositions[idx + 4] = ry + tailDy;
+        this.rainPositions[idx + 5] = rz;
       }
-      this.rainPoints.geometry.attributes.position.needsUpdate = true;
+      this.rainLines.geometry.attributes.position.needsUpdate = true;
     }
 
     // Lightning in storm

@@ -569,6 +569,34 @@ export class StreetDetailsManager {
     });
 
     this.farDetailGroup.add(boxInst, bushInst, flowerInst);
+
+    // 3. Bayside Promenade foreground accent bollards & warm coastal lanterns (clear of spawn at -135, -20)
+    const lanternPostMat = new THREE.MeshStandardMaterial({ color: 0x1d232b, metalness: 0.75, roughness: 0.35 });
+    const lanternGlowMat = new THREE.MeshStandardMaterial({
+      color: 0xffefc2,
+      emissive: 0xffc870,
+      emissiveIntensity: 2.2,
+      roughness: 0.15,
+    });
+    const postGeo = new THREE.CylinderGeometry(0.11, 0.15, 1.1, 10);
+    const bulbGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.24, 10);
+    const plazaLights: [number, number][] = [
+      [-126, -28],
+      [-126, -12],
+      [-114, -28],
+      [-114, -12],
+      [-142, -32],
+      [-142, -8],
+    ];
+    for (const [lx, lz] of plazaLights) {
+      const ly = getGroundHeight(lx, lz);
+      const post = new THREE.Mesh(postGeo, lanternPostMat);
+      post.position.set(lx, ly + 0.55, lz);
+      post.castShadow = true;
+      const bulb = new THREE.Mesh(bulbGeo, lanternGlowMat);
+      bulb.position.set(lx, ly + 1.12, lz);
+      this.farDetailGroup.add(post, bulb);
+    }
   }
 
   applyQuality(quality: QualityPreset): void {
