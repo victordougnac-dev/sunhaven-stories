@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ROAD_X, ROAD_Z, type TrafficSignalState } from './WorldManager';
 import type { QualityPreset } from './types';
+import { createSculptedCarMesh, type CarBodyStyle } from './CarGeometry';
 
 interface TrafficCar {
   group: THREE.Group;
@@ -18,8 +19,18 @@ export class TrafficManager {
   private group = new THREE.Group();
   private activeCount = 20;
 
-  private hlOn = new THREE.MeshBasicMaterial({ color: 0xfff5c0 });
-  private hlOff = new THREE.MeshStandardMaterial({ color: 0xd0d8e0, roughness: 0.25 });
+  private hlOn = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xfff2c2,
+    emissiveIntensity: 3.0,
+    roughness: 0.1,
+  });
+  private hlOff = new THREE.MeshStandardMaterial({
+    color: 0xdce6ee,
+    emissive: 0xd8ebff,
+    emissiveIntensity: 0.35,
+    roughness: 0.15,
+  });
 
   constructor(scene: THREE.Scene) {
     scene.add(this.group);
@@ -27,13 +38,8 @@ export class TrafficManager {
   }
 
   private spawnTraffic(): void {
-    const colors = [0xe74c3c, 0x3498db, 0xf39c12, 0x2ecc71, 0xecf0f1, 0x34495e, 0x1abc9c];
-    const bodyGeo = new THREE.BoxGeometry(1.9, 0.72, 4.3);
-    const cabinGeo = new THREE.BoxGeometry(1.65, 0.56, 2.2);
-    const cabinMat = new THREE.MeshStandardMaterial({ color: 0x16222f, roughness: 0.2, metalness: 0.8 });
-    const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.24, 10);
-    wheelGeo.rotateZ(Math.PI * 0.5);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x141619, roughness: 0.9 });
+    const colors = [0xd6362c, 0x1e6fb8, 0xe8941c, 0x1c9a5e, 0xeef2f5, 0x263240, 0x15a89d, 0x8a3052];
+    const styles: CarBodyStyle[] = ['sedan', 'sports', 'suv', 'sedan', 'pickup'];
 
     for (let i = 0; i < 20; i++) {
       const axis: 'x' | 'z' = i % 2 === 0 ? 'z' : 'x';
@@ -44,35 +50,19 @@ export class TrafficManager {
       const laneOffset = axis === 'z' ? (dir === 1 ? -3.4 : 3.4) : dir === 1 ? 3.4 : -3.4;
       const laneCoord = roadCenter + laneOffset;
 
-      const g = new THREE.Group();
-      const paintMat = new THREE.MeshStandardMaterial({
-        color: colors[i % colors.length],
-        roughness: 0.3,
-        metalness: 0.5,
-      });
-
-      const body = new THREE.Mesh(bodyGeo, paintMat);
-      body.position.y = 0.54;
-      body.castShadow = true;
-      g.add(body);
-
-      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-      cabin.position.set(0, 1.12, 0.1);
-      g.add(cabin);
-
-      for (const [wx, wz] of [[-0.9, -1.35], [0.9, -1.35], [-0.9, 1.35], [0.9, 1.35]]) {
-        const w = new THREE.Mesh(wheelGeo, wheelMat);
-        w.position.set(wx, 0.35, wz);
-        g.add(w);
-      }
-
-      const headlights: THREE.Mesh[] = [];
-      for (const hx of [-0.62, 0.62]) {
-        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.08), this.hlOff);
-        hl.position.set(hx, 0.58, -2.16);
-        g.add(hl);
-        headlights.push(hl);
-      }
+      const style = styles[i % styles.length];
+      const parts = createSculptedCarMesh(
+        style,
+        colors[i % colors.length],
+        style === 'pickup' ? 4.8 : 4.4,
+        style === 'suv' || style === 'pickup' ? 2.05 : 1.92,
+        {
+          lightweight: true,
+          headlightMatOff: this.hlOff,
+        }
+      );
+      const g = parts.group;
+      const headlights = parts.headlights;
 
       const startAlong = -210 + ((i * 67) % 420);
       const pos =

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { AABBCollider, VehicleSpec } from './types';
 import type { InputState } from './PlayerController';
+import { createSculptedCarMesh, type CarBodyStyle } from './CarGeometry';
 
 export interface VehicleInstance {
   spec: VehicleSpec;
@@ -23,10 +24,30 @@ export class VehicleController {
   public vehicles: VehicleInstance[] = [];
   public activeVehicle: VehicleInstance | null = null;
   private group = new THREE.Group();
-  private headlightMatOn = new THREE.MeshBasicMaterial({ color: 0xfff6cf });
-  private headlightMatOff = new THREE.MeshStandardMaterial({ color: 0xd9e1e8, roughness: 0.2 });
-  private taillightMatBrake = new THREE.MeshBasicMaterial({ color: 0xff2a2a });
-  private taillightMatDim = new THREE.MeshStandardMaterial({ color: 0x6b1414, roughness: 0.3 });
+  private headlightMatOn = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0xfff3c4,
+    emissiveIntensity: 3.4,
+    roughness: 0.1,
+  });
+  private headlightMatOff = new THREE.MeshStandardMaterial({
+    color: 0xe6eff5,
+    emissive: 0xdff2ff,
+    emissiveIntensity: 0.45,
+    roughness: 0.12,
+  });
+  private taillightMatBrake = new THREE.MeshStandardMaterial({
+    color: 0xff4040,
+    emissive: 0xff1e24,
+    emissiveIntensity: 3.6,
+    roughness: 0.12,
+  });
+  private taillightMatDim = new THREE.MeshStandardMaterial({
+    color: 0x99181c,
+    emissive: 0xcc151c,
+    emissiveIntensity: 0.75,
+    roughness: 0.2,
+  });
 
   constructor(scene: THREE.Scene, getGroundHeight: (x: number, z: number) => number) {
     scene.add(this.group);
@@ -336,115 +357,32 @@ export class VehicleController {
       bodyGroup.add(hl);
       headlights.push(hl);
     } else {
-      // Cars, SUVs, Pickups, Vans
-      const chassisH = spec.kind === 'sports' ? 0.58 : spec.kind === 'van' ? 1.25 : 0.72;
-      const chassisY = spec.kind === 'suv' || spec.kind === 'pickup' ? 0.66 : 0.54;
-
-      const chassis = new THREE.Mesh(new THREE.BoxGeometry(spec.width, chassisH, spec.length), paintMat);
-      chassis.position.set(0, chassisY, 0);
-      chassis.castShadow = true;
-      chassis.receiveShadow = true;
-      bodyGroup.add(chassis);
-
-      // Cabin + interior dashboard & seats visible through tinted windows
-      const cabinLen = spec.kind === 'van' ? spec.length * 0.78 : spec.kind === 'pickup' ? spec.length * 0.38 : spec.length * 0.52;
-      const cabinZ = spec.kind === 'pickup' ? -0.45 : spec.kind === 'van' ? 0.25 : 0.15;
-      const cabinH = spec.kind === 'sports' ? 0.48 : 0.62;
-      const cabinY = chassisY + chassisH * 0.5 + cabinH * 0.45;
-      const cabin = new THREE.Mesh(
-        new THREE.BoxGeometry(spec.width * 0.84, cabinH, cabinLen),
-        cabinMat
-      );
-      cabin.position.set(0, cabinY, cabinZ);
-      cabin.castShadow = true;
-      bodyGroup.add(cabin);
-
-      const roofCap = new THREE.Mesh(
-        new THREE.BoxGeometry(spec.width * 0.82, 0.08, cabinLen * 0.86),
-        paintMat
-      );
-      roofCap.position.set(0, cabinY + cabinH * 0.48, cabinZ);
-      bodyGroup.add(roofCap);
-
-      const dash = new THREE.Mesh(
-        new THREE.BoxGeometry(spec.width * 0.74, 0.22, 0.4),
-        trimMat
-      );
-      dash.position.set(0, chassisY + chassisH * 0.5 + 0.12, cabinZ - cabinLen * 0.32);
-      bodyGroup.add(dash);
-
-      // Side Mirrors & Door Handles
-      for (const side of [-1, 1]) {
-        const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.16), paintMat);
-        mirror.position.set(side * (spec.width * 0.52), chassisY + chassisH * 0.5 + 0.08, cabinZ - cabinLen * 0.28);
-        bodyGroup.add(mirror);
-
-        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.22), trimMat);
-        handle.position.set(side * (spec.width * 0.51), chassisY + 0.18, cabinZ);
-        bodyGroup.add(handle);
-      }
-
-      // Front Grille & Rear License Plate
-      const grille = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.46, 0.2, 0.08), trimMat);
-      grille.position.set(0, chassisY - 0.02, -spec.length * 0.5 - 0.02);
-      bodyGroup.add(grille);
-
-      const plate = new THREE.Mesh(
-        new THREE.BoxGeometry(0.46, 0.16, 0.05),
-        new THREE.MeshStandardMaterial({ color: 0xf4f1de, roughness: 0.4 })
-      );
-      plate.position.set(0, chassisY - 0.08, spec.length * 0.5 + 0.03);
-      bodyGroup.add(plate);
-
-      if (spec.kind === 'sports') {
-        const spoiler = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.92, 0.1, 0.36), trimMat);
-        spoiler.position.set(0, chassisY + chassisH * 0.5 + 0.24, spec.length * 0.44);
-        bodyGroup.add(spoiler);
-      }
-
-      // Bumpers & headlights/taillights
-      for (const sx of [-spec.width * 0.34, spec.width * 0.34]) {
-        const hl = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, 0.1), this.headlightMatOff);
-        hl.position.set(sx, chassisY + 0.08, -spec.length * 0.5 - 0.02);
-        bodyGroup.add(hl);
-        headlights.push(hl);
-
-        const tl = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.16, 0.1), this.taillightMatDim);
-        tl.position.set(sx, chassisY + 0.08, spec.length * 0.5 + 0.02);
-        bodyGroup.add(tl);
-        taillights.push(tl);
-      }
-
-      // 4 Wheels + rims
-      const wheelRadius = spec.kind === 'suv' || spec.kind === 'pickup' ? 0.42 : 0.36;
-      const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, 0.26, 16);
-      wheelGeo.rotateZ(Math.PI / 2);
-      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x17191e, roughness: 0.85 });
-      const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.55, wheelRadius * 0.55, 0.28, 10);
-      rimGeo.rotateZ(Math.PI / 2);
-      const rimMat = new THREE.MeshStandardMaterial({ color: 0xc8d0d8, metalness: 0.8, roughness: 0.25 });
-
-      const wx = spec.width * 0.48;
-      const wzFront = -spec.length * 0.32;
-      const wzRear = spec.length * 0.32;
-
-      for (const [xPos, zPos, isFront] of [
-        [-wx, wzFront, true],
-        [wx, wzFront, true],
-        [-wx, wzRear, false],
-        [wx, wzRear, false],
-      ] as [number, number, boolean][]) {
-        const pivot = new THREE.Group();
-        pivot.position.set(xPos, wheelRadius, zPos);
-        const tire = new THREE.Mesh(wheelGeo, wheelMat);
-        tire.castShadow = true;
-        const rim = new THREE.Mesh(rimGeo, rimMat);
-        tire.add(rim);
-        pivot.add(tire);
-        group.add(pivot);
-        wheels.push(tire);
-        if (isFront) frontSteerPivots.push(pivot);
-      }
+      const style: CarBodyStyle =
+        spec.kind === 'sports' || spec.kind === 'sedan' || spec.kind === 'suv' || spec.kind === 'pickup' || spec.kind === 'van'
+          ? spec.kind
+          : 'sedan';
+      const sculpted = createSculptedCarMesh(style, spec.color, spec.length, spec.width, {
+        isSecret,
+        lightweight: false,
+        headlightMatOff: this.headlightMatOff,
+        taillightMatDim: this.taillightMatDim,
+      });
+      return {
+        spec,
+        group: sculpted.group,
+        bodyGroup: sculpted.bodyGroup,
+        wheels: sculpted.wheels,
+        frontSteerPivots: sculpted.frontSteerPivots,
+        headlights: sculpted.headlights,
+        taillights: sculpted.taillights,
+        position: new THREE.Vector3(),
+        yaw: 0,
+        speed: 0,
+        steerAngle: 0,
+        damage: 0,
+        lightsOn: false,
+        isSecret,
+      };
     }
 
     return {

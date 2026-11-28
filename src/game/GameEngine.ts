@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { CrazyGamesManager } from './CrazyGamesManager';
 import { SaveManager } from './SaveManager';
 import { TextureFactory } from './TextureFactory';
@@ -26,6 +30,9 @@ export class GameEngine {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
+  private composer!: EffectComposer;
+  private bloomPass!: UnrealBloomPass;
+  private useComposer = true;
 
   private cg = new CrazyGamesManager();
   private saveMgr!: SaveManager;
@@ -87,12 +94,23 @@ export class GameEngine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 1.06;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0xa6dcf5, 0.00095);
+    this.scene.fog = new THREE.FogExp2(0xeab892, 0.00082);
 
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.2, 2600);
+
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.34,
+      0.55,
+      0.86
+    );
+    this.composer.addPass(this.bloomPass);
+    this.composer.addPass(new OutputPass());
   }
 
   async init(): Promise<void> {
@@ -237,20 +255,41 @@ export class GameEngine {
   private setupEnvironmentMap(): void {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     const envScene = new THREE.Scene();
-    envScene.background = new THREE.Color(0x8ecae6);
-    const sunOrb = new THREE.Mesh(
-      new THREE.SphereGeometry(6, 12, 10),
-      new THREE.MeshBasicMaterial({ color: 0xfff5d6 })
-    );
-    sunOrb.position.set(18, 26, -12);
-    const groundBounce = new THREE.Mesh(
-      new THREE.PlaneGeometry(120, 120),
-      new THREE.MeshBasicMaterial({ color: 0x5d6d7e })
-    );
-    groundBounce.rotation.x = -Math.PI / 2;
-    groundBounce.position.y = -10;
-    envScene.add(sunOrb, groundBounce);
-    const rt = pmrem.fromScene(envScene, 0.04);
+
+    const domeGeo = new THREE.SphereGeometry(50, 24, 16);
+    const domeMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: `
+        varying vec3 vDir;
+        void main() {
+          vDir = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vDir;
+        void main() {
+          float y = vDir.y;
+          vec3 col;
+          if (y >= 0.0) {
+            vec3 horiz = vec3(1.0, 0.72, 0.50);
+            vec3 zenith = vec3(0.14, 0.44, 0.78);
+            col = mix(horiz, zenith, pow(y, 0.45));
+          } else {
+            vec3 sea = vec3(0.06, 0.28, 0.36);
+            vec3 ground = vec3(0.28, 0.25, 0.22);
+            col = mix(sea, ground, clamp(-y * 2.0, 0.0, 1.0));
+          }
+          vec3 sunDir = normalize(vec3(0.7, 0.28, -0.4));
+          float s = max(dot(vDir, sunDir), 0.0);
+          col += vec3(1.0, 0.88, 0.65) * pow(s, 18.0) * 1.4;
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    });
+    envScene.add(new THREE.Mesh(domeGeo, domeMat));
+
+    const rt = pmrem.fromScene(envScene, 0.035);
     this.scene.environment = rt.texture;
     pmrem.dispose();
   }
@@ -451,6 +490,10 @@ export class GameEngine {
     this.streetDetails.applyQuality(s.quality);
     this.npcMgr.applyQuality(s.quality);
     this.trafficMgr.applyQuality(s.quality);
+    this.useComposer = s.quality !== 'low';
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.bloomPass.strength = s.quality === 'ultra' ? 0.38 : 0.32;
   }
 
   private bindInputEvents(): void {
@@ -458,6 +501,8 @@ export class GameEngine {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.composer.setSize(window.innerWidth, window.innerHeight);
+      this.bloomPass.setSize(window.innerWidth, window.innerHeight);
     });
 
     document.addEventListener('visibilitychange', () => {
@@ -694,6 +739,14 @@ export class GameEngine {
     }
   }
 
+  private renderFrame(): void {
+    if (this.useComposer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
   private animate = (): void => {
     requestAnimationFrame(this.animate);
     const dt = Math.min(0.05, this.clock.getDelta());
@@ -711,12 +764,12 @@ export class GameEngine {
       this.camera.lookAt(focus);
       this.timeMgr.update(dt * 0.2, focus, this.weatherMgr.current, this.scene);
       this.worldMgr.update(dt, this.elapsed, this.timeMgr.nightFactor, this.weatherMgr.windStrength);
-      this.renderer.render(this.scene, this.camera);
+      this.renderFrame();
       return;
     }
 
     if (this.paused) {
-      this.renderer.render(this.scene, this.camera);
+      this.renderFrame();
       return;
     }
 
@@ -905,6 +958,19 @@ export class GameEngine {
       }
     }
 
+    // Dynamic wet asphalt reflections during rain/storm
+    const isWet = this.weatherMgr.current === 'rain' || this.weatherMgr.current === 'storm';
+    this.texFactory.palette.asphalt.roughness = THREE.MathUtils.lerp(
+      this.texFactory.palette.asphalt.roughness,
+      isWet ? 0.2 : 0.78,
+      dt * 0.6
+    );
+    this.texFactory.palette.asphalt.metalness = THREE.MathUtils.lerp(
+      this.texFactory.palette.asphalt.metalness,
+      isWet ? 0.35 : 0.08,
+      dt * 0.6
+    );
+
     // Periodic autosave
     this.autoSaveTimer += dt;
     if (this.autoSaveTimer > 20) {
@@ -913,6 +979,6 @@ export class GameEngine {
       this.saveMgr.save();
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.renderFrame();
   };
 }

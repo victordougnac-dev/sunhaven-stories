@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ROAD_X, ROAD_Z } from './WorldManager';
 import type { QualityPreset } from './types';
+import { createSculptedCarMesh, type CarBodyStyle } from './CarGeometry';
 
 export class StreetDetailsManager {
   public group = new THREE.Group();
@@ -434,18 +435,8 @@ export class StreetDetailsManager {
   }
 
   private buildParkedAmbientCars(getGroundHeight: (x: number, z: number) => number): void {
-    const colors = [0x3d5a80, 0xc94c4c, 0xd8dcd6, 0x2b2d42, 0xe09f3e, 0x4a7c59, 0x6c757d];
-    const bodyGeo = new THREE.BoxGeometry(1.9, 0.7, 4.35);
-    const cabinGeo = new THREE.BoxGeometry(1.64, 0.55, 2.15);
-    const glassMat = new THREE.MeshStandardMaterial({
-      color: 0x162533,
-      roughness: 0.12,
-      metalness: 0.85,
-      envMapIntensity: 1.4,
-    });
-    const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.24, 12);
-    wheelGeo.rotateZ(Math.PI * 0.5);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x141619, roughness: 0.9 });
+    const colors = [0x2a4b72, 0xc43636, 0xdfe3dc, 0x202331, 0xe88b2e, 0x3b6e4c, 0x5c6670, 0x168d9e];
+    const styles: CarBodyStyle[] = ['sports', 'sedan', 'suv', 'sedan', 'pickup'];
 
     const parkingSpots: [number, number, number][] = [
       // Bayside & Downtown curb parking
@@ -462,29 +453,17 @@ export class StreetDetailsManager {
 
     parkingSpots.forEach(([px, pz, yaw], idx) => {
       const py = getGroundHeight(px, pz);
-      const cg = new THREE.Group();
-      const paint = new THREE.MeshStandardMaterial({
-        color: colors[idx % colors.length],
-        roughness: 0.25,
-        metalness: 0.6,
-        envMapIntensity: 1.2,
-      });
-      const body = new THREE.Mesh(bodyGeo, paint);
-      body.position.y = 0.54;
-      body.castShadow = true;
-      const cabin = new THREE.Mesh(cabinGeo, glassMat);
-      cabin.position.set(0, 1.1, 0.12);
-      cg.add(body, cabin);
-
-      for (const [wx, wz] of [[-0.9, -1.35], [0.9, -1.35], [-0.9, 1.35], [0.9, 1.35]]) {
-        const w = new THREE.Mesh(wheelGeo, wheelMat);
-        w.position.set(wx, 0.35, wz);
-        cg.add(w);
-      }
-
-      cg.position.set(px, py, pz);
-      cg.rotation.y = yaw;
-      this.farDetailGroup.add(cg);
+      const style = styles[idx % styles.length];
+      const parts = createSculptedCarMesh(
+        style,
+        colors[idx % colors.length],
+        style === 'pickup' ? 4.8 : 4.4,
+        style === 'suv' || style === 'pickup' ? 2.04 : 1.92,
+        { lightweight: true }
+      );
+      parts.group.position.set(px, py, pz);
+      parts.group.rotation.y = yaw;
+      this.farDetailGroup.add(parts.group);
     });
   }
 

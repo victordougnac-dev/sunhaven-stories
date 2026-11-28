@@ -287,24 +287,29 @@ export class WorldManager {
 
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.9,
+      bumpMap: this.palette.sand.map,
+      bumpScale: 0.14,
+      roughness: 0.92,
       metalness: 0.02,
     });
     const terrain = new THREE.Mesh(terrainGeo, terrainMat);
     terrain.receiveShadow = true;
     this.group.add(terrain);
 
-    // Tropical Ocean Plane
-    const waterGeo = new THREE.PlaneGeometry(4200, 4200, 32, 32);
+    // Tropical Clearcoat Reflective Ocean Plane
+    const waterGeo = new THREE.PlaneGeometry(4400, 4400, 48, 48);
     waterGeo.rotateX(-Math.PI / 2);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x0d7a94,
+    const waterMat = new THREE.MeshPhysicalMaterial({
+      color: 0x064f68,
       normalMap: this.waterNormalTex,
-      normalScale: new THREE.Vector2(0.45, 0.45),
-      roughness: 0.14,
-      metalness: 0.58,
+      normalScale: new THREE.Vector2(1.05, 1.05),
+      roughness: 0.07,
+      metalness: 0.24,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.04,
+      envMapIntensity: 2.4,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.92,
     });
     this.waterMesh = new THREE.Mesh(waterGeo, waterMat);
     this.waterMesh.position.y = -0.35;
@@ -1575,15 +1580,15 @@ export class WorldManager {
     this.waterNormalTex.offset.y = (elapsed * 0.018) % 1;
     this.waterMesh.position.y = -0.35 + Math.sin(elapsed * 1.15) * 0.14;
 
-    // Night illumination on skyscrapers, streetlights, runway & neon
-    const glow = THREE.MathUtils.clamp((nightFactor - 0.35) / 0.45, 0, 1);
+    // Night & magic-hour illumination on skyscrapers, streetlights, runway & neon
+    const glow = THREE.MathUtils.clamp((nightFactor - 0.18) / 0.48, 0, 1);
     for (const mat of this.palette.glassTowerDay) {
-      mat.emissiveIntensity = glow * 1.15;
+      mat.emissiveIntensity = glow * 1.65;
     }
-    this.streetLampBulbMat.emissiveIntensity = glow * 2.2;
-    this.runwayLightMat.emissiveIntensity = 0.4 + glow * 2.0;
+    this.streetLampBulbMat.emissiveIntensity = 0.35 + glow * 2.8;
+    this.runwayLightMat.emissiveIntensity = 0.65 + glow * 2.4;
     for (const n of this.neonSignMats) {
-      n.emissiveIntensity = 0.7 + glow * 1.6;
+      n.emissiveIntensity = 1.25 + glow * 2.1;
     }
 
     // Wind sway on palm fronds

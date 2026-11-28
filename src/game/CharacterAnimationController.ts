@@ -37,17 +37,22 @@ function createContouredProfile(
   radialSegs = 16
 ): THREE.BufferGeometry {
   const positions: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
+  const invR = Math.max(1, rings.length - 1);
 
   for (let r = 0; r < rings.length; r++) {
     const ring = rings[r];
     const ox = ring.ox ?? 0;
     const oz = ring.oz ?? 0;
+    const v = r / invR;
     for (let s = 0; s <= radialSegs; s++) {
-      const theta = (s / radialSegs) * Math.PI * 2;
+      const u = s / radialSegs;
+      const theta = u * Math.PI * 2;
       const x = ox + Math.cos(theta) * ring.rx;
       const z = oz + Math.sin(theta) * ring.rz;
       positions.push(x, ring.y, z);
+      uvs.push(u, v);
     }
   }
 
@@ -69,6 +74,7 @@ function createContouredProfile(
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geo.setIndex(indices);
   geo.computeVertexNormals();
   return geo;
@@ -119,43 +125,167 @@ function createSculptedHeadGeometry(): THREE.BufferGeometry {
   return geo;
 }
 
+interface HumanoidTextures {
+  clothMap: THREE.CanvasTexture;
+  clothBump: THREE.CanvasTexture;
+  denimMap: THREE.CanvasTexture;
+  denimBump: THREE.CanvasTexture;
+  hairBump: THREE.CanvasTexture;
+  skinMap: THREE.CanvasTexture;
+}
+
+let cachedHumanoidTex: HumanoidTextures | null = null;
+
+function getHumanoidTextures(): HumanoidTextures {
+  if (cachedHumanoidTex) return cachedHumanoidTex;
+
+  const mkTex = (w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, srgb: boolean) => {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext('2d')!;
+    draw(ctx);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    tex.needsUpdate = true;
+    return tex;
+  };
+
+  const clothMap = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#f2f2f2';
+    ctx.fillRect(0, 0, 128, 128);
+    // Subtle shoulder/torso fabric fold shadows + linen grain
+    for (let y = 0; y < 128; y += 2) {
+      ctx.fillStyle = y % 4 === 0 ? 'rgba(0,0,0,0.035)' : 'rgba(255,255,255,0.035)';
+      ctx.fillRect(0, y, 128, 1);
+    }
+    for (let x = 0; x < 128; x += 2) {
+      ctx.fillStyle = x % 4 === 0 ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)';
+      ctx.fillRect(x, 0, 1, 128);
+    }
+    // Center spine & side seams
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(63, 0, 2, 128);
+    ctx.fillRect(0, 0, 2, 128);
+  }, true);
+
+  const clothBump = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 2000; i++) {
+      const v = 110 + Math.floor(Math.random() * 40);
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 1);
+    }
+  }, false);
+
+  const denimMap = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#eceef2';
+    ctx.fillRect(0, 0, 128, 128);
+    // Diagonal denim twill weave & subtle outer stitching
+    ctx.strokeStyle = 'rgba(0,0,0,0.065)';
+    ctx.lineWidth = 1;
+    for (let i = -128; i < 256; i += 4) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 128, 128);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(64, 0);
+    ctx.lineTo(64, 128);
+    ctx.stroke();
+  }, true);
+
+  const denimBump = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#7c7c7c';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.strokeStyle = '#9a9a9a';
+    for (let i = -128; i < 256; i += 3) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i + 128, 128);
+      ctx.stroke();
+    }
+  }, false);
+
+  const hairBump = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#707070';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let x = 0; x < 128; x += 2) {
+      const v = 90 + Math.floor(Math.random() * 75);
+      ctx.fillStyle = `rgb(${v},${v},${v})`;
+      ctx.fillRect(x, 0, 1.5, 128);
+    }
+  }, false);
+
+  const skinMap = mkTex(128, 128, (ctx) => {
+    ctx.fillStyle = '#f8f2ee';
+    ctx.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 1200; i++) {
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,235,220,0.08)' : 'rgba(180,110,90,0.05)';
+      ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+    }
+  }, true);
+
+  cachedHumanoidTex = { clothMap, clothBump, denimMap, denimBump, hairBump, skinMap };
+  return cachedHumanoidTex;
+}
+
 export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
   const root = new THREE.Group();
+  const tex = getHumanoidTextures();
 
   const skinMat = new THREE.MeshStandardMaterial({
     color: appearance.skinColor,
-    roughness: 0.52,
+    map: tex.skinMap,
+    roughness: 0.56,
     metalness: 0.02,
   });
   const lipMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(appearance.skinColor).multiplyScalar(0.74),
-    roughness: 0.45,
+    roughness: 0.44,
   });
   const shirtMat = new THREE.MeshStandardMaterial({
     color: appearance.shirtColor,
-    roughness: 0.78,
+    map: tex.clothMap,
+    bumpMap: tex.clothBump,
+    bumpScale: 0.008,
+    roughness: 0.82,
     metalness: 0.02,
   });
   const jacketMat = new THREE.MeshStandardMaterial({
     color: appearance.jacketColor ?? appearance.shirtColor,
-    roughness: 0.62,
-    metalness: 0.05,
+    map: tex.clothMap,
+    bumpMap: tex.clothBump,
+    bumpScale: 0.012,
+    roughness: 0.68,
+    metalness: 0.04,
   });
   const pantsMat = new THREE.MeshStandardMaterial({
     color: appearance.pantsColor,
-    roughness: 0.85,
+    map: tex.denimMap,
+    bumpMap: tex.denimBump,
+    bumpScale: 0.014,
+    roughness: 0.86,
     metalness: 0.02,
   });
   const shoeMat = new THREE.MeshStandardMaterial({
     color: appearance.shoeColor,
-    roughness: 0.48,
-    metalness: 0.08,
+    roughness: 0.44,
+    metalness: 0.1,
   });
-  const soleMat = new THREE.MeshStandardMaterial({ color: 0xefefef, roughness: 0.75 });
+  const soleMat = new THREE.MeshStandardMaterial({ color: 0xefefef, roughness: 0.78 });
   const hairMat = new THREE.MeshStandardMaterial({
     color: appearance.hairColor,
-    roughness: 0.58,
-    metalness: 0.1,
+    bumpMap: tex.hairBump,
+    bumpScale: 0.015,
+    roughness: 0.54,
+    metalness: 0.12,
   });
   const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf7f7f7, roughness: 0.18 });
   const irisMat = new THREE.MeshStandardMaterial({ color: 0x2b4d5e, roughness: 0.15 });
@@ -181,9 +311,16 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
       { y: 0.065, rx: 0.165, rz: 0.115 },
       { y: 0.105, rx: 0.158, rz: 0.11 },
     ]),
-    new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.4, metalness: 0.35 })
+    new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.36, metalness: 0.38 })
   );
   hips.add(belt);
+
+  const buckle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.054, 0.042, 0.018),
+    new THREE.MeshStandardMaterial({ color: 0xd0d6de, roughness: 0.2, metalness: 0.9 })
+  );
+  buckle.position.set(0, 0.085, 0.114);
+  hips.add(buckle);
 
   // Spine & Seamless V-Tapered Athletic Torso
   const spine = new THREE.Group();
@@ -385,6 +522,21 @@ export function buildHumanoidRig(appearance: HumanoidAppearance): HumanoidRig {
     thumb.position.set(-side * 0.02, -0.252, 0.024);
     thumb.rotation.z = side * 0.42;
     elbow.add(thumb);
+
+    if (side === -1) {
+      const watch = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.033, 0.033, 0.018, 12),
+        new THREE.MeshStandardMaterial({ color: 0x20242c, roughness: 0.3, metalness: 0.8 })
+      );
+      watch.position.y = -0.21;
+      elbow.add(watch);
+      const face = new THREE.Mesh(
+        new THREE.BoxGeometry(0.014, 0.022, 0.022),
+        new THREE.MeshStandardMaterial({ color: 0xd9e1e8, roughness: 0.15, metalness: 0.9 })
+      );
+      face.position.set(-0.029, -0.21, 0);
+      elbow.add(face);
+    }
 
     return [shoulder, elbow];
   };

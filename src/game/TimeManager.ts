@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import type { TimeMode, WeatherState } from './types';
 
 export class TimeManager {
-  public timeOfDay = 14.5; // Hours 0..24 (starts bright sunny afternoon)
+  public timeOfDay = 17.35; // Golden tropical magic hour (dramatic coastal shadows & reflections)
   public mode: TimeMode = 'cycle';
-  public cycleSpeed = 0.16; // ~2.5 mins per full 24h cycle
+  public cycleSpeed = 0.14; // ~2.8 mins per full 24h cycle
 
   public sunLight: THREE.DirectionalLight;
   public hemiLight: THREE.HemisphereLight;
@@ -14,6 +14,7 @@ export class TimeManager {
     bottomColor: { value: THREE.Color };
     sunDir: { value: THREE.Vector3 };
     nightFactor: { value: number };
+    timeSec: { value: number };
   };
 
   public nightFactor = 0;
@@ -22,32 +23,34 @@ export class TimeManager {
   private stars: THREE.Points;
 
   constructor(scene: THREE.Scene) {
-    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 2.2);
+    this.sunLight = new THREE.DirectionalLight(0xffe6bd, 2.55);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.near = 10;
-    this.sunLight.shadow.camera.far = 520;
-    const d = 145;
+    this.sunLight.shadow.camera.near = 8;
+    this.sunLight.shadow.camera.far = 420;
+    const d = 105;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.bias = -0.0006;
+    this.sunLight.shadow.bias = -0.0003;
+    this.sunLight.shadow.normalBias = 0.025;
     scene.add(this.sunLight);
     scene.add(this.sunLight.target);
 
-    this.hemiLight = new THREE.HemisphereLight(0x88ccff, 0x4b4338, 0.85);
+    this.hemiLight = new THREE.HemisphereLight(0x94d3ff, 0x615548, 0.92);
     scene.add(this.hemiLight);
 
-    // Procedural atmospheric gradient sky dome
+    // Rayleigh / Mie inspired coastal atmospheric sky dome
     this.skyUniforms = {
-      topColor: { value: new THREE.Color(0x1f76c7) },
-      bottomColor: { value: new THREE.Color(0xaedcf7) },
-      sunDir: { value: new THREE.Vector3(0.4, 0.7, 0.3) },
+      topColor: { value: new THREE.Color(0x185fa8) },
+      bottomColor: { value: new THREE.Color(0xf7ae7c) },
+      sunDir: { value: new THREE.Vector3(0.7, 0.25, -0.4) },
       nightFactor: { value: 0 },
+      timeSec: { value: 0 },
     };
 
-    const skyGeo = new THREE.SphereGeometry(2200, 24, 16);
+    const skyGeo = new THREE.SphereGeometry(2250, 32, 22);
     const skyMat = new THREE.ShaderMaterial({
       uniforms: this.skyUniforms,
       side: THREE.BackSide,
@@ -65,13 +68,57 @@ export class TimeManager {
         uniform vec3 bottomColor;
         uniform vec3 sunDir;
         uniform float nightFactor;
+        uniform float timeSec;
         varying vec3 vWorldPos;
+
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = hash(i);
+          float b = hash(i + vec2(1.0, 0.0));
+          float c = hash(i + vec2(0.0, 1.0));
+          float d = hash(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0;
+          float a = 0.5;
+          for (int i = 0; i < 4; i++) {
+            v += a * noise(p);
+            p *= 2.05;
+            a *= 0.5;
+          }
+          return v;
+        }
+
         void main() {
           vec3 dir = normalize(vWorldPos);
           float h = clamp(dir.y, 0.0, 1.0);
-          vec3 col = mix(bottomColor, topColor, pow(h, 0.55));
-          float sunDot = max(dot(dir, normalize(sunDir)), 0.0);
-          col += vec3(1.0, 0.78, 0.45) * pow(sunDot, 22.0) * (1.0 - nightFactor * 0.85) * 0.55;
+          // Multi-band Rayleigh horizon scatter
+          vec3 horizonWarm = mix(bottomColor, vec3(1.0, 0.62, 0.36), clamp((1.0 - nightFactor) * (1.0 - h * 2.5), 0.0, 1.0) * 0.48);
+          vec3 col = mix(horizonWarm, topColor, pow(h, 0.48));
+
+          // Mie solar scatter aureole
+          vec3 sDir = normalize(sunDir);
+          float sunDot = max(dot(dir, sDir), 0.0);
+          float dayVis = 1.0 - nightFactor * 0.88;
+          col += vec3(1.0, 0.58, 0.28) * pow(sunDot, 5.0) * 0.36 * dayVis;
+          col += vec3(1.0, 0.84, 0.56) * pow(sunDot, 36.0) * 0.72 * dayVis;
+          col += vec3(1.0, 0.96, 0.88) * smoothstep(0.9985, 0.9997, sunDot) * 1.45 * dayVis;
+
+          // Subtle volumetric coastal cirrus clouds
+          if (dir.y > 0.03) {
+            vec2 cloudUv = dir.xz / (dir.y + 0.14) * 1.4 + vec2(timeSec * 0.008, timeSec * 0.003);
+            float c = fbm(cloudUv * 1.5);
+            float cMask = smoothstep(0.48, 0.76, c) * smoothstep(0.03, 0.24, dir.y) * (1.0 - nightFactor * 0.8);
+            vec3 cloudCol = mix(vec3(0.98, 0.95, 0.92), vec3(1.0, 0.72, 0.52), pow(sunDot, 2.0) * 0.75);
+            col = mix(col, cloudCol, cMask * 0.45);
+          }
+
           gl_FragColor = vec4(col, 1.0);
         }
       `,
@@ -80,8 +127,8 @@ export class TimeManager {
     scene.add(this.skyMesh);
 
     this.sunDisc = new THREE.Mesh(
-      new THREE.SphereGeometry(42, 16, 12),
-      new THREE.MeshBasicMaterial({ color: 0xfff2c2, fog: false })
+      new THREE.SphereGeometry(40, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xffefc2, fog: false })
     );
     scene.add(this.sunDisc);
 
@@ -126,6 +173,7 @@ export class TimeManager {
     if (this.mode === 'cycle') {
       this.timeOfDay = (this.timeOfDay + dt * this.cycleSpeed) % 24;
     }
+    this.skyUniforms.timeSec.value += dt;
 
     // Sun angle (6:00 sunrise -> 12:00 zenith -> 18:00 sunset)
     const angle = ((this.timeOfDay - 6) / 24) * Math.PI * 2;
